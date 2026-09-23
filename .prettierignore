@@ -1,0 +1,8 @@
+node_modules
+.tools
+apps/api/generated
+dist
+build
+AGENTS.md
+*.lock
+apps/officer-mobile/android

@@ -1,0 +1,16 @@
+node_modules/
+apps/api/generated/
+.tools/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.dart_tool/
+.flutter-plugins*
+build/
+local.properties
+android/.gradle/
+private-storage/
+.storage/

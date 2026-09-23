@@ -1,0 +1,210 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { OffenceStatus, Prisma } from '../generated/client';
+import { randomBytes } from 'crypto';
+import { Actor } from './auth';
+import { CreateOffenceDto, OffenceQuery, ReviewDto } from './dto';
+import { PrismaService } from './prisma.service';
+import { assignedSupervisor } from './operations.controller';
+
+export function scope(actor: Actor): Prisma.OffenceWhereInput {
+  if (actor.role === 'OFFICER') return { officerId: actor.id };
+  if (actor.role === 'SUPERVISOR')
+    return { supervisorId: actor.id, status: { not: 'DRAFT' } };
+  // Admins manage configuration/audit; they do not receive operational record access.
+  return { id: '00000000-0000-0000-0000-000000000000' };
+}
+export function canTransition(from: OffenceStatus, to: OffenceStatus) {
+  return (
+    (from === 'SUBMITTED' && to === 'UNDER_REVIEW') ||
+    (from === 'UNDER_REVIEW' && (to === 'CONFIRMED' || to === 'CANCELLED'))
+  );
+}
+const details = { vehicle: true, category: true, ticket: true } as const;
+
+@Injectable()
+export class OffencesService {
+  constructor(private readonly db: PrismaService) {}
+
+  private async transaction<T>(
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.db.$transaction(work, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          ['P2034', 'P2002'].includes(error.code)
+        ) {
+          if (attempt < 3) continue;
+          throw new ConflictException(
+            'Concurrent change; retry with the same request key',
+          );
+        }
+        throw error;
+      }
+    }
+  }
+
+  async create(actor: Actor, dto: CreateOffenceDto) {
+    if ((dto.latitude == null) !== (dto.longitude == null))
+      throw new BadRequestException('Provide both coordinates or neither');
+    if (new Date(dto.observedAt).getTime() > Date.now() + 60000)
+      throw new BadRequestException('Observation cannot be in the future');
+    return this.transaction(async (tx) => {
+      const existing = await tx.offence.findUnique({
+        where: { requestKey: dto.requestKey },
+        include: details,
+      });
+      if (existing) {
+        if (
+          existing.officerId !== actor.id ||
+          existing.vehicleId !== dto.vehicleId ||
+          existing.categoryId !== dto.categoryId ||
+          existing.notes !== dto.notes ||
+          existing.location !== dto.location ||
+          existing.observedAt.getTime() !==
+            new Date(dto.observedAt).getTime() ||
+          existing.latitude !== (dto.latitude ?? null) ||
+          existing.longitude !== (dto.longitude ?? null)
+        ) {
+          throw new ConflictException(
+            'Request key already used for a different draft',
+          );
+        }
+        return existing;
+      }
+      const vehicle = await tx.vehicle.findUnique({
+        where: { id: dto.vehicleId },
+      });
+      const category = await tx.offenceCategory.findFirst({
+        where: { id: dto.categoryId, active: true },
+      });
+      if (!vehicle || !category)
+        throw new BadRequestException('Unknown vehicle or inactive category');
+      const supervisorId = await assignedSupervisor(tx, actor.id);
+      const offence = await tx.offence.create({
+        data: {
+          ...dto,
+          observedAt: new Date(dto.observedAt),
+          officerId: actor.id,
+          supervisorId,
+        },
+        include: details,
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: actor.id,
+          action: 'DRAFT_CREATED',
+          entityType: 'Offence',
+          entityId: offence.id,
+        },
+      });
+      return offence;
+    });
+  }
+
+  async list(actor: Actor, query: OffenceQuery) {
+    const where: Prisma.OffenceWhereInput = {
+      AND: [scope(actor), query.status ? { status: query.status } : {}],
+    };
+    const [items, total] = await this.db.$transaction([
+      this.db.offence.findMany({
+        where,
+        include: details,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+      this.db.offence.count({ where }),
+    ]);
+    return { items, total, page: query.page, pageSize: query.pageSize };
+  }
+
+  async get(actor: Actor, id: string) {
+    const offence = await this.db.offence.findFirst({
+      where: { AND: [{ id }, scope(actor)] },
+      include: details,
+    });
+    if (!offence) throw new NotFoundException('Record not found');
+    return offence;
+  }
+
+  async submit(actor: Actor, id: string) {
+    return this.transaction(async (tx) => {
+      const offence = await tx.offence.findFirst({
+        where: { id, officerId: actor.id },
+        include: details,
+      });
+      if (!offence) throw new NotFoundException('Record not found');
+      if (offence.ticket) return offence.ticket;
+      if (offence.status !== 'DRAFT')
+        throw new ConflictException('Only drafts can be submitted');
+      const ticket = await tx.ticket.create({
+        data: {
+          offenceId: id,
+          publicReference: randomBytes(24).toString('hex'),
+          demoFineAmountSnapshot: offence.category.demoFineAmount,
+        },
+      });
+      await tx.offence.update({ where: { id }, data: { status: 'SUBMITTED' } });
+      await tx.auditEvent.create({
+        data: {
+          actorId: actor.id,
+          action: 'TICKET_ISSUED',
+          entityType: 'Offence',
+          entityId: id,
+        },
+      });
+      return ticket;
+    });
+  }
+
+  async review(actor: Actor, id: string, dto: ReviewDto) {
+    return this.transaction(async (tx) => {
+      const offence = await tx.offence.findFirst({
+        where: { AND: [{ id }, scope(actor)] },
+      });
+      if (!offence) throw new NotFoundException('Record not found');
+      if (!canTransition(offence.status, dto.status))
+        throw new ConflictException('Invalid review transition');
+      const result = await tx.offence.update({
+        where: { id },
+        data: {
+          status: dto.status,
+          reviewNotes: dto.notes,
+          reviewedAt: new Date(),
+        },
+        include: details,
+      });
+      if (dto.status === 'CANCELLED')
+        await tx.ticket.update({
+          where: { offenceId: id },
+          data: { status: 'CANCELLED' },
+        });
+      await tx.auditEvent.create({
+        data: {
+          actorId: actor.id,
+          action: 'OFFENCE_REVIEWED',
+          entityType: 'Offence',
+          entityId: id,
+          safeMetadata: { from: offence.status, to: dto.status },
+        },
+      });
+      return {
+        ...result,
+        ticket:
+          result.ticket && dto.status === 'CANCELLED'
+            ? { ...result.ticket, status: 'CANCELLED' }
+            : result.ticket,
+      };
+    });
+  }
+}

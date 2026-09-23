@@ -1,0 +1,135 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #162c3e;
+  background: #f2f5f8;
+  font-synthesis: none;
+  line-height: 1.5;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+.banner {
+  background: #ffdd8a;
+  color: #362400;
+  text-align: center;
+  padding: 0.6rem;
+  font-weight: 650;
+}
+header {
+  background: #142d40;
+  color: white;
+  padding: 1.5rem 5%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+h1 {
+  margin: 0;
+}
+.eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  color: #b4dce5;
+}
+main {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+section {
+  background: white;
+  padding: 1.5rem;
+  border: 1px solid #d5dfe6;
+  border-radius: 0.7rem;
+  margin-bottom: 1rem;
+}
+h2 {
+  margin-top: 0;
+}
+.login {
+  max-width: 480px;
+  margin: 3rem auto;
+}
+form {
+  display: grid;
+  gap: 1rem;
+}
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  padding: 0.65rem;
+  border: 1px solid #748998;
+  border-radius: 0.3rem;
+}
+input,
+select,
+textarea {
+  background: white;
+  color: #162c3e;
+}
+textarea {
+  min-height: 90px;
+}
+button {
+  background: #14566a;
+  color: white;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+:focus-visible {
+  outline: 3px solid #bb6b00;
+  outline-offset: 3px;
+}
+.error {
+  background: #ffeded;
+  color: #8d1717;
+  padding: 1rem;
+  border-left: 4px solid #8d1717;
+}
+.table-wrap {
+  overflow: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.8rem;
+  border-bottom: 1px solid #d5dfe6;
+}
+.pagination {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.ticket {
+  overflow-wrap: anywhere;
+  padding: 1rem;
+  background: #fff7df;
+  margin-bottom: 1rem;
+}
+fieldset { border: 0; padding: 0; margin: 0; }
+input[type='checkbox'] { width: auto; margin-right: 0.5rem; }
+nav { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+nav button[aria-pressed='true'] { background: #243746; outline: 2px solid #bb6b00; }
+.metrics { display: flex; flex-wrap: wrap; gap: 1rem; }
+.metrics p { background: #e6f2f5; padding: 1rem; border-radius: 8px; }
+.metrics strong { display: block; font-size: 2rem; }

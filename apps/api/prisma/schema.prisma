@@ -1,0 +1,224 @@
+generator client {
+  provider = "prisma-client-js"
+  output = "../generated/client"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+  OFFICER
+  SUPERVISOR
+  ADMIN
+}
+enum OffenceStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  CONFIRMED
+  CANCELLED
+}
+enum TicketStatus {
+  ISSUED
+  CANCELLED
+}
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  name String
+  email String @unique
+  role Role
+  passwordHash String
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessions Session[]
+  offences Offence[] @relation("Officer")
+  assignedOffences Offence[] @relation("Supervisor")
+  profile OfficerProfile?
+  audits AuditEvent[]
+  supervisorId String? @db.Uuid
+  supervisor User? @relation("Team", fields: [supervisorId], references: [id])
+  team User[] @relation("Team")
+  incidents Incident[] @relation("Reporter")
+  assignedIncidents Incident[] @relation("IncidentSupervisor")
+  checkpoints Checkpoint[]
+  alerts TrafficAlert[]
+  uploads Evidence[]
+}
+model OfficerProfile {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  badgeNumber String @unique
+  stationName String
+}
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  tokenHash String @unique
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([expiresAt])
+}
+model Driver {
+  id String @id @default(uuid()) @db.Uuid
+  fullName String
+  licenceNumber String @unique
+  licenceStatus String
+  vehicles Vehicle[]
+}
+model Vehicle {
+  id String @id @default(uuid()) @db.Uuid
+  registrationNumber String @unique
+  make String
+  model String
+  colour String
+  registrationStatus String
+  driverId String? @db.Uuid
+  driver Driver? @relation(fields: [driverId], references: [id])
+  offences Offence[]
+}
+model OffenceCategory {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique
+  name String
+  description String
+  demoFineAmount Decimal @db.Decimal(10, 2)
+  active Boolean @default(true)
+  offences Offence[]
+}
+model Offence {
+  id String @id @default(uuid()) @db.Uuid
+  officerId String @db.Uuid
+  officer User @relation("Officer", fields: [officerId], references: [id])
+  supervisorId String @db.Uuid
+  supervisor User @relation("Supervisor", fields: [supervisorId], references: [id])
+  vehicleId String @db.Uuid
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  categoryId String @db.Uuid
+  category OffenceCategory @relation(fields: [categoryId], references: [id])
+  requestKey String @unique @db.Uuid
+  location String
+  notes String
+  latitude Float?
+  longitude Float?
+  observedAt DateTime
+  createdAt DateTime @default(now())
+  status OffenceStatus @default(DRAFT)
+  reviewedAt DateTime?
+  reviewNotes String?
+  ticket Ticket?
+  evidence Evidence[]
+  @@index([officerId, createdAt])
+  @@index([supervisorId, status])
+}
+model Ticket {
+  id String @id @default(uuid()) @db.Uuid
+  offenceId String @unique @db.Uuid
+  offence Offence @relation(fields: [offenceId], references: [id])
+  publicReference String @unique
+  demoFineAmountSnapshot Decimal @db.Decimal(10, 2)
+  status TicketStatus @default(ISSUED)
+  issuedAt DateTime @default(now())
+  publicAccess PublicTicketAccess?
+}
+model AuditEvent {
+  id String @id @default(uuid()) @db.Uuid
+  actorId String? @db.Uuid
+  actor User? @relation(fields: [actorId], references: [id])
+  action String
+  entityType String
+  entityId String
+  timestamp DateTime @default(now())
+  safeMetadata Json?
+  @@index([timestamp])
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+enum CheckpointStatus {
+  PLANNED
+  ACTIVE
+  CLOSED
+}
+model Incident {
+  id String @id @default(uuid()) @db.Uuid
+  requestKey String @unique @db.Uuid
+  reportedBy String? @db.Uuid
+  reporter User? @relation("Reporter", fields: [reportedBy], references: [id])
+  source String @default("OFFICER")
+  supervisorId String @db.Uuid
+  supervisor User @relation("IncidentSupervisor", fields: [supervisorId], references: [id])
+  type String
+  description String
+  location String
+  latitude Float?
+  longitude Float?
+  status IncidentStatus @default(OPEN)
+  resolutionNotes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([reportedBy, createdAt])
+  @@index([supervisorId, status])
+}
+model Checkpoint {
+  id String @id @default(uuid()) @db.Uuid
+  name String
+  location String
+  latitude Float
+  longitude Float
+  startAt DateTime
+  endAt DateTime
+  status CheckpointStatus @default(PLANNED)
+  createdBy String @db.Uuid
+  creator User @relation(fields: [createdBy], references: [id])
+  createdAt DateTime @default(now())
+  @@index([status, startAt])
+}
+model SystemSetting {
+  key String @id
+  publicNotice String @default("Fictional training environment. No real payments or enforcement.")
+  updatedAt DateTime @updatedAt
+}
+model PublicTicketAccess {
+  ticketId String @id @db.Uuid
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  codeHash String
+  paidAt DateTime?
+  receiptReference String? @unique
+  sessions PublicTicketSession[]
+}
+model PublicTicketSession {
+  tokenHash String @id
+  ticketId String @db.Uuid
+  access PublicTicketAccess @relation(fields: [ticketId], references: [ticketId], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model TrafficAlert {
+  id String @id @default(uuid()) @db.Uuid
+  title String
+  message String
+  active Boolean @default(true)
+  createdBy String @db.Uuid
+  creator User @relation(fields: [createdBy], references: [id])
+  createdAt DateTime @default(now())
+}
+model Evidence {
+  id String @id @default(uuid()) @db.Uuid
+  offenceId String @db.Uuid
+  offence Offence @relation(fields: [offenceId], references: [id])
+  privateStorageKey String @unique
+  mimeType String
+  byteSize Int
+  sha256 String
+  uploadedBy String @db.Uuid
+  uploader User @relation(fields: [uploadedBy], references: [id])
+  createdAt DateTime @default(now())
+  @@unique([offenceId, sha256])
+}
