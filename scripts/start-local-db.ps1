@@ -26,7 +26,7 @@ if (-not (Test-Path (Join-Path $dataPath 'PG_VERSION'))) {
 }
 & (Join-Path $pgBin 'pg_ctl.exe') -D $dataPath status *> $null
 if ($LASTEXITCODE -ne 0) {
-  & (Join-Path $pgBin 'pg_ctl.exe') -D $dataPath -l (Join-Path $projectRoot '.tools/postgres.log') -o '-h 127.0.0.1 -p 5432' -w start
+  & (Join-Path $pgBin 'pg_ctl.exe') -D $dataPath -l (Join-Path $projectRoot '.tools/postgres.log') -o '-h 127.0.0.1 -p 5432' -t 300 -w start
   if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL startup failed; inspect .tools/postgres.log' }
 }
 $previousPassword = $env:PGPASSWORD

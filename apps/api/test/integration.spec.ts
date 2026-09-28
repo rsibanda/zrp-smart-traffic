@@ -11,6 +11,7 @@ import { configure } from '../src/configure';
 import { PrismaService } from '../src/prisma.service';
 
 config({ path: resolve(__dirname, '../../../.env') });
+jest.setTimeout(30000);
 describe('Real PostgreSQL demo workflow (migrate and seed first)', () => {
   let app: INestApplication;
   let db: PrismaService;
@@ -53,7 +54,7 @@ describe('Real PostgreSQL demo workflow (migrate and seed first)', () => {
   });
   it('rejects anonymous requests, invalid credentials and unknown payload fields', async () => {
     await request(app.getHttpServer())
-      .get('/api/v1/vehicles?registration=DEMO001')
+      .get('/api/v1/vehicles?registration=ABC1234')
       .expect(401);
     await request(app.getHttpServer())
       .post('/api/v1/auth/login')
@@ -71,10 +72,10 @@ describe('Real PostgreSQL demo workflow (migrate and seed first)', () => {
   });
   it('looks up fictional plates and creates one draft across retries', async () => {
     const vehicle = await request(app.getHttpServer())
-      .get('/api/v1/vehicles?registration=demo-001')
+      .get('/api/v1/vehicles?registration=abc-1234')
       .auth(officer, { type: 'bearer' })
       .expect(200);
-    expect(vehicle.body.items[0].registrationNumber).toBe('DEMO001');
+    expect(vehicle.body.items[0].registrationNumber).toBe('ABC1234');
     const unknown = await request(app.getHttpServer())
       .get('/api/v1/vehicles?registration=UNKNOWN')
       .auth(officer, { type: 'bearer' })
@@ -202,6 +203,81 @@ describe('Real PostgreSQL demo workflow (migrate and seed first)', () => {
       .get('/api/v1/audit-events')
       .auth(officer, { type: 'bearer' })
       .expect(403);
+  });
+  it('edits only owned drafts, rejects stale writes, searches and discards with audit', async () => {
+    const vehicle = await db.vehicle.findUniqueOrThrow({
+      where: { registrationNumber: 'ABC1234' },
+    });
+    const category = await db.offenceCategory.findFirstOrThrow({
+      where: { active: true },
+    });
+    const draft = await request(app.getHttpServer())
+      .post('/api/v1/offences')
+      .auth(officer, { type: 'bearer' })
+      .send({
+        requestKey: randomUUID(),
+        vehicleId: vehicle.id,
+        categoryId: category.id,
+        location: 'Revision test original',
+        notes: 'Fictional draft revision',
+        observedAt: new Date().toISOString(),
+      })
+      .expect(201);
+    const id = draft.body.id;
+    created.push(id);
+    const edit = (token: string, body: object) =>
+      request(app.getHttpServer())
+        .patch(`/api/v1/offences/${id}`)
+        .auth(token, { type: 'bearer' })
+        .send(body);
+    await edit(other, { revision: 0, notes: 'Unauthorized attempt' }).expect(
+      404,
+    );
+    await edit(supervisor, {
+      revision: 0,
+      notes: 'Unauthorized attempt',
+    }).expect(403);
+    await edit(officer, { revision: 0, latitude: -17.8 }).expect(400);
+    await edit(officer, { revision: 0, notes: null }).expect(400);
+    const updated = await edit(officer, {
+      revision: 0,
+      location: 'Unique revision search location',
+    }).expect(200);
+    expect(updated.body.revision).toBe(1);
+    await edit(officer, { revision: 0, notes: 'Stale overwrite' }).expect(409);
+    const search = await request(app.getHttpServer())
+      .get('/api/v1/offences?q=Unique%20revision')
+      .auth(officer, { type: 'bearer' })
+      .expect(200);
+    expect(search.body.items.some((row: { id: string }) => row.id === id)).toBe(
+      true,
+    );
+    await request(app.getHttpServer())
+      .post(`/api/v1/offences/${id}/discard`)
+      .auth(other, { type: 'bearer' })
+      .expect(404);
+    for (let retry = 0; retry < 2; retry++)
+      await request(app.getHttpServer())
+        .post(`/api/v1/offences/${id}/discard`)
+        .auth(officer, { type: 'bearer' })
+        .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/offences/${id}/submit`)
+      .auth(officer, { type: 'bearer' })
+      .expect(409);
+    expect(
+      await db.auditEvent.count({
+        where: { entityId: id, action: 'DRAFT_DISCARDED' },
+      }),
+    ).toBe(1);
+    expect(await db.offence.findUnique({ where: { id } })).toMatchObject({
+      status: 'CANCELLED',
+    });
+    await request(app.getHttpServer())
+      .patch(`/api/v1/offences/${draftId}`)
+      .auth(officer, { type: 'bearer' })
+      .send({ revision: 0, notes: 'Attempt after submission' })
+      .expect(409);
   });
   it('revokes sessions on logout', async () => {
     await request(app.getHttpServer())

@@ -7,6 +7,7 @@ datasource db {
   url = env("DATABASE_URL")
 }
 enum Role {
+  USER
   OFFICER
   SUPERVISOR
   ADMIN
@@ -59,6 +60,7 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+  ticketSessions PublicTicketSession[]
   @@index([expiresAt])
 }
 model Driver {
@@ -106,6 +108,7 @@ model Offence {
   observedAt DateTime
   createdAt DateTime @default(now())
   status OffenceStatus @default(DRAFT)
+  revision Int @default(0)
   reviewedAt DateTime?
   reviewNotes String?
   ticket Ticket?
@@ -182,7 +185,7 @@ model Checkpoint {
 }
 model SystemSetting {
   key String @id
-  publicNotice String @default("Fictional training environment. No real payments or enforcement.")
+  publicNotice String @default("View current traffic notices and road information.")
   updatedAt DateTime @updatedAt
 }
 model PublicTicketAccess {
@@ -195,10 +198,13 @@ model PublicTicketAccess {
 }
 model PublicTicketSession {
   tokenHash String @id
+  accountSessionId String @db.Uuid
+  accountSession Session @relation(fields: [accountSessionId], references: [id], onDelete: Cascade)
   ticketId String @db.Uuid
   access PublicTicketAccess @relation(fields: [ticketId], references: [ticketId], onDelete: Cascade)
   expiresAt DateTime
   @@index([expiresAt])
+  @@index([accountSessionId])
 }
 model TrafficAlert {
   id String @id @default(uuid()) @db.Uuid

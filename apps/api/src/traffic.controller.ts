@@ -4,6 +4,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  Patch,
   ParseUUIDPipe,
   Post,
   Query,
@@ -18,11 +19,12 @@ import {
   PageQuery,
   ReviewDto,
   VehicleQuery,
+  UpdateOffenceDto,
 } from './dto';
 import { OffencesService, scope } from './offences.service';
 import { PrismaService } from './prisma.service';
 
-@ApiTags('Demo traffic')
+@ApiTags('Traffic')
 @ApiBearerAuth()
 @UseGuards(SessionGuard)
 @Controller()
@@ -47,7 +49,7 @@ export class TrafficController {
       where: { id },
       include: { driver: { select: { fullName: true, licenceStatus: true } } },
     });
-    if (!result) throw new NotFoundException('No matching demo record');
+    if (!result) throw new NotFoundException('No matching records.');
     return result;
   }
   @Get('offence-categories')
@@ -78,6 +80,20 @@ export class TrafficController {
   submit(@Req() req: StaffRequest, @Param('id', ParseUUIDPipe) id: string) {
     return this.offences.submit(req.actor, id);
   }
+  @Patch('offences/:id')
+  @Roles('OFFICER')
+  update(
+    @Req() req: StaffRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateOffenceDto,
+  ) {
+    return this.offences.update(req.actor, id, dto);
+  }
+  @Post('offences/:id/discard')
+  @Roles('OFFICER')
+  discard(@Req() req: StaffRequest, @Param('id', ParseUUIDPipe) id: string) {
+    return this.offences.discard(req.actor, id);
+  }
   @Post('offences/:id/review')
   @Roles('SUPERVISOR')
   review(
@@ -99,7 +115,7 @@ export class TrafficController {
     if (!ticket) throw new NotFoundException('Record not found');
     return {
       ...ticket,
-      disclaimer: 'DEMO — NOT VALID FOR PAYMENT OR ENFORCEMENT',
+      disclaimer: 'Academic Prototype',
     };
   }
   @Get('audit-events')

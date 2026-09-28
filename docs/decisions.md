@@ -15,3 +15,22 @@
 - Exact plate lookup only; no public registry. Local host binding and private PostgreSQL port by default. All future file endpoints must require authenticated, ownership-checked access.
 - Generate Android runner files using the user's installed Flutter SDK; retain supplied Dart source. Flutter/Android SDK and Docker were absent during initial inspection, so startup across all projects remains unverified.
 - TO VERIFY: course rubric, proposed review workflow, eventual retention period, assignment rules and accessibility evaluation. No domain or institutional rules have been invented.
+- Android finishing increment: prefer the user's Android Studio SDK and bundled Java over the incomplete portable Android SDK. Official command-line tools 19.0 were downloaded with Google's repository SHA-1 verified because the newer native SDK wrapper previously crashed on this Windows installation. Android 36, NDK 28.2 and CMake are installed alongside the user's existing Android 37/Pixel_8 setup.
+- Draft updates use optimistic revision checks plus serializable transactions. Discard is an audited terminal state rather than deletion. Existing rows receive revision 0 through a non-destructive migration.
+- Mobile location capture is an explicit one-shot permission request, never a subscription or background service. Manual location remains available. Offline encrypted persistence remains a documented optional design.
+
+## Motorist account login (September 28)
+
+The user's clarified requirement supersedes the original anonymous portal entry: the main login offers User (motorist), Officer and Supervisor. USER is a separate least-privilege database role; it cannot query staff records. Existing ADMIN accounts remain on a separate `/admin` sign-in page to preserve account management. An optional login category is checked against the stored role, never used to assign permissions; older mobile clients may omit it.
+
+Motorists sign in before verifying a ticket or reporting an incident. Ticket verification still requires both reference and a separate code, and issues a restricted ticket token tied to the originating account session. Logout, account session expiry, disabling the account and role changes invalidate ticket access. Reports retain the reporting account and remain unverified reports for supervisor review. General notices remain publicly readable by API, but are not displayed on the login page.
+
+Migration `20260928100000_motorist_accounts` adds USER and the parent-session foreign key. It invalidates only legacy anonymous ticket sessions; ticket/payment/history records and existing accounts are preserved. Seed adds `user@demo.invalid`; administrators provision additional motorist accounts. No self-registration or automatic matching to driver records is implied.
+
+## Operational terminology (September 28)
+
+The user's explicit UI revision supersedes the earlier large banner/watermark presentation in AGENTS.md. Web and mobile now use ZRP Smart Traffic branding and a small Academic Prototype footer. This is a presentation change, with no official integration or endorsement asserted. Payments remain accurately labelled simulations and collect no money.
+
+Session `name` remains the source of the displayed identity; role labels are mapped to Motorist, Traffic Officer, Supervisor and Administrator. No new session fields or personal identifiers were added. Generated seed display names and known initial records are updated by an exact-match data migration, preserving existing IDs, relationships, credentials and submitted ticket references. The seed plate is now ABC1234; normalization still accepts ABC 1234 or abc-1234. Existing account email addresses remain unchanged.
+
+Status labels are presentation-only. Incident OPEN displays Submitted and IN_PROGRESS displays Under review. Existing offence states display readable badges. Payment NOT_SIMULATED displays Pending and SIMULATED_PAID displays Paid within the explicitly simulated-payment interface. Checkpoint CLOSED remains Closed: the existing data cannot distinguish cancellation from completion. Additional requested states (incident Assigned/Closed, checkpoint Completed/Cancelled, offence Paid, payment Failed/Refunded) were not fabricated or added because doing so would change workflow/API contracts. Offence confirmation and ticket payment remain separate.

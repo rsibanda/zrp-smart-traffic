@@ -1,15 +1,22 @@
+import { Field } from './Field';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AdminPanel } from './AdminPanel';
 import { OperationsPanel } from './OperationsPanel';
 import { PublicPortal } from './PublicPortal';
 import { EvidencePanel } from './EvidencePanel';
+import { roleLabel, statusLabel, StatusBadge } from './presentation';
 
-type User = { id: string; name: string; role: 'OFFICER' | 'SUPERVISOR' | 'ADMIN' };
+type User = {
+  id: string;
+  name: string;
+  role: 'USER' | 'OFFICER' | 'SUPERVISOR' | 'ADMIN';
+};
 type Offence = {
   id: string;
   location: string;
   notes: string;
   status: string;
+  revision: number;
   vehicle: { registrationNumber: string };
   category: { name: string };
   ticket: null | {
@@ -21,6 +28,7 @@ type Offence = {
 };
 type Session = { token: string; user: User };
 export function App() {
+  const adminLogin = window.location.pathname === '/admin';
   const [session, setSession] = useState<Session | null>(null);
   const currentSession = useRef<Session | null>(null);
   currentSession.current = session;
@@ -32,6 +40,7 @@ export function App() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
   const api = useCallback(
     async (path: string, body?: unknown, method?: string) => {
       let response: Response;
@@ -48,7 +57,11 @@ export function App() {
       } catch {
         throw new Error('API unavailable. Check your connection and retry.');
       }
-      if (response.status === 401 && session && currentSession.current?.token === session.token) {
+      if (
+        response.status === 401 &&
+        session &&
+        currentSession.current?.token === session.token
+      ) {
         setSession(null);
         setItems([]);
         setSelected(null);
@@ -67,7 +80,11 @@ export function App() {
   );
 
   useEffect(() => {
-    if (!session || session.user.role === 'ADMIN') {
+    if (
+      !session ||
+      session.user.role === 'ADMIN' ||
+      session.user.role === 'USER'
+    ) {
       setLoading(false);
       return;
     }
@@ -76,7 +93,7 @@ export function App() {
       if (active) setLoading(true);
       try {
         const data = await api(
-          `/offences?page=${page}&pageSize=20${status ? `&status=${status}` : ''}`,
+          `/offences?page=${page}&pageSize=20&q=${encodeURIComponent(search)}${status ? `&status=${status}` : ''}`,
         );
         if (active) {
           setItems(data.items);
@@ -95,7 +112,7 @@ export function App() {
       active = false;
       clearInterval(timer);
     };
-  }, [api, session, page, status]);
+  }, [api, session, page, status, search]);
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -107,6 +124,7 @@ export function App() {
         await api('/auth/login', {
           email: form.get('email'),
           password: form.get('password'),
+          category: adminLogin ? 'ADMIN' : form.get('category'),
         }),
       );
       setPage(1);
@@ -165,17 +183,19 @@ export function App() {
   }
   return (
     <>
-      <div className="banner">
-        DEMO / UNIVERSITY PROTOTYPE — fictional records only
-      </div>
       <header>
         <div>
           <span className="eyebrow">TRAFFIC OPERATIONS</span>
-          <h1>Smart Traffic</h1>
+          <h1>ZRP Smart Traffic Management System</h1>
         </div>
         {session && (
-          <div>
-            {session.user.name} · {session.user.role}{' '}
+          <div className="session-info">
+            <div className="session-identity">
+              <strong>{session.user.name}</strong>
+              <span className="session-role">
+                {roleLabel(session.user.role)}
+              </span>
+            </div>
             <button disabled={busy} onClick={() => void logout()}>
               Sign out
             </button>
@@ -183,7 +203,7 @@ export function App() {
         )}
       </header>
       <main aria-busy={busy || loading}>
-        {loading && <p role="status">Refreshing demo records…</p>}
+        {loading && <p role="status">Refreshing records…</p>}
         {error && (
           <p role="alert" className="error">
             {error}
@@ -191,35 +211,59 @@ export function App() {
         )}
         {!session ? (
           <section className="login">
-            <h2>Staff sign in</h2>
+            <h2>{adminLogin ? 'Administrator sign in' : 'Sign in'}</h2>
             <p>
-              Use a locally seeded demo account. This is not an official ZRP
-              system.
+              Sign in with your account to access traffic management services.
             </p>
             <form onSubmit={login}>
-              <label>
+              {!adminLogin && (
+                <Field>
+                  Login category
+                  <select
+                    name="category"
+                    defaultValue="USER"
+                    required
+                    disabled={busy}
+                  >
+                    <option value="USER">User</option>
+                    <option value="OFFICER">Officer</option>
+                    <option value="SUPERVISOR">Supervisor</option>
+                  </select>
+                </Field>
+              )}
+              <Field>
                 Email
                 <input
                   name="email"
+                  placeholder="name@example.com"
                   type="email"
                   autoComplete="username"
                   required
                 />
-              </label>
-              <label>
+              </Field>
+              <Field>
                 Password
                 <input
                   name="password"
+                  placeholder="Enter your password"
                   type="password"
                   autoComplete="current-password"
                   required
                 />
-              </label>
+              </Field>
               <button disabled={busy}>
                 {busy ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
           </section>
+        ) : session.user.role === 'USER' ? (
+          <PublicPortal
+            accountToken={session.token}
+            onSessionExpired={() => {
+              setSession(null);
+              setError('Your session expired. Please sign in again.');
+            }}
+          />
         ) : session.user.role === 'ADMIN' ? (
           <AdminPanel api={api} />
         ) : (
@@ -232,38 +276,59 @@ export function App() {
                   : 'Your activity'}
               </h2>
               <p>
-                Stored demo records · refreshes every 10 seconds · {total}{' '}
-                matching records
+                Activity records · refreshes every 10 seconds · {total} matching
+                records
               </p>
-              <label>
-                Status
-                <select
-                  value={status}
-                  onChange={(e) => {
-                    setStatus(e.target.value);
-                    setPage(1);
-                  }}
-                >
-                  <option value="">All permitted states</option>
-                  {[
-                    'DRAFT',
-                    'SUBMITTED',
-                    'UNDER_REVIEW',
-                    'CONFIRMED',
-                    'CANCELLED',
-                  ].map((state) => (
-                    <option key={state}>{state}</option>
-                  ))}
-                </select>
-              </label>
-              <div className="table-wrap">
+              <div className="filter-bar">
+                <Field>
+                  Status
+                  <select
+                    value={status}
+                    onChange={(e) => {
+                      setStatus(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="">All permitted states</option>
+                    {[
+                      'DRAFT',
+                      'SUBMITTED',
+                      'UNDER_REVIEW',
+                      'CONFIRMED',
+                      'CANCELLED',
+                    ].map((state) => (
+                      <option key={state} value={state}>
+                        {statusLabel(state)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field>
+                  Search plate, location or ticket reference
+                  <input
+                    value={search}
+                    placeholder="Registration, location or ticket reference"
+                    maxLength={80}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </Field>
+              </div>
+              <div
+                className="table-wrap"
+                tabIndex={0}
+                role="region"
+                aria-label="Traffic offences table"
+              >
                 <table>
                   <thead>
                     <tr>
-                      <th>Demo plate</th>
+                      <th>Vehicle registration</th>
                       <th>Category</th>
                       <th>Status</th>
-                      <th>Action</th>
+                      <th className="action-column">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -271,7 +336,9 @@ export function App() {
                       <tr key={item.id}>
                         <td>{item.vehicle.registrationNumber}</td>
                         <td>{item.category.name}</td>
-                        <td>{item.status}</td>
+                        <td>
+                          <StatusBadge value={item.status} />
+                        </td>
                         <td>
                           <button
                             disabled={busy}
@@ -286,8 +353,8 @@ export function App() {
                 </table>
               </div>
               {!items.length && !loading && (
-                <p>
-                  No matching records. New officer submissions appear here
+                <p className="empty-state">
+                  No traffic offences found. New officer submissions appear here
                   automatically.
                 </p>
               )}
@@ -310,39 +377,132 @@ export function App() {
             {selected && (
               <section aria-label="Offence detail">
                 <h2>
-                  {selected.vehicle.registrationNumber} · {selected.status}
+                  {selected.vehicle.registrationNumber} ·{' '}
+                  <StatusBadge value={selected.status} />
                 </h2>
                 <p>{selected.location}</p>
                 <p>{selected.notes}</p>
+                {session.user.role === 'OFFICER' &&
+                  selected.status === 'DRAFT' && (
+                    <form
+                      key={`${selected.id}-${selected.revision}`}
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        const data = new FormData(e.currentTarget);
+                        setBusy(true);
+                        setError('');
+                        try {
+                          const updated = await api(
+                            `/offences/${selected.id}`,
+                            {
+                              revision: selected.revision,
+                              location: data.get('location'),
+                              notes: data.get('notes'),
+                            },
+                            'PATCH',
+                          );
+                          setSelected(updated);
+                          setItems((old) =>
+                            old.map((row) =>
+                              row.id === updated.id ? updated : row,
+                            ),
+                          );
+                        } catch (e) {
+                          setError((e as Error).message);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      <h3>Edit your draft</h3>
+                      <Field>
+                        Draft location
+                        <input
+                          name="location"
+                          required
+                          minLength={3}
+                          maxLength={200}
+                          defaultValue={selected.location}
+                        />
+                      </Field>
+                      <Field>
+                        Draft notes
+                        <textarea
+                          name="notes"
+                          required
+                          minLength={3}
+                          maxLength={2000}
+                          defaultValue={selected.notes}
+                        />
+                      </Field>
+                      <button disabled={busy}>Save draft changes</button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          setError('');
+                          try {
+                            await api(`/offences/${selected.id}/discard`, {});
+                            const updated = await api(
+                              `/offences/${selected.id}`,
+                            );
+                            setSelected(updated);
+                            setItems((old) =>
+                              old.map((row) =>
+                                row.id === updated.id ? updated : row,
+                              ),
+                            );
+                          } catch (e) {
+                            setError((e as Error).message);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Discard draft (retain audit)
+                      </button>
+                    </form>
+                  )}
                 {selected.ticket && (
                   <div className="ticket">
-                    <strong>DEMO — NOT VALID FOR PAYMENT OR ENFORCEMENT</strong>
+                    <h3>Traffic ticket</h3>
                     <p>Reference: {selected.ticket.publicReference}</p>
                     <p>
-                      Demo amount: {selected.ticket.demoFineAmountSnapshot}{' '}
-                      training units · {selected.ticket.status}
+                      Amount: {selected.ticket.demoFineAmountSnapshot} ·{' '}
+                      <StatusBadge value={selected.ticket.status} />
                     </p>
                   </div>
                 )}
-                <EvidencePanel key={selected.id} api={api} token={session.token} offenceId={selected.id} draft={selected.status === 'DRAFT'} ticketId={selected.ticket?.id} officer={session.user.role === 'OFFICER'} />
+                <EvidencePanel
+                  key={selected.id}
+                  api={api}
+                  token={session.token}
+                  offenceId={selected.id}
+                  draft={selected.status === 'DRAFT'}
+                  ticketId={selected.ticket?.id}
+                  officer={session.user.role === 'OFFICER'}
+                />
                 {session.user.role === 'SUPERVISOR' &&
                   ['SUBMITTED', 'UNDER_REVIEW'].includes(selected.status) && (
                     <form
                       key={`${selected.id}-${selected.status}`}
                       onSubmit={review}
                     >
-                      <label>
+                      <Field>
                         Review outcome
                         <select name="status">
                           {(selected.status === 'SUBMITTED'
                             ? ['UNDER_REVIEW']
                             : ['CONFIRMED', 'CANCELLED']
                           ).map((state) => (
-                            <option key={state}>{state}</option>
+                            <option key={state} value={state}>
+                              {statusLabel(state)}
+                            </option>
                           ))}
                         </select>
-                      </label>
-                      <label>
+                      </Field>
+                      <Field>
                         Review notes
                         <textarea
                           name="notes"
@@ -350,7 +510,7 @@ export function App() {
                           minLength={3}
                           maxLength={1000}
                         />
-                      </label>
+                      </Field>
                       <button disabled={busy}>Save review</button>
                     </form>
                   )}
@@ -358,8 +518,8 @@ export function App() {
             )}
           </>
         )}
-        {!session && <PublicPortal />}
       </main>
+      <footer className="app-footer">Academic Prototype</footer>
     </>
   );
 }

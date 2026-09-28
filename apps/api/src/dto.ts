@@ -1,4 +1,9 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  OmitType,
+  PartialType,
+} from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsEmail,
@@ -23,9 +28,13 @@ export class LoginDto {
   @IsEmail()
   email!: string;
   @ApiProperty() @IsString() @Length(1, 200) password!: string;
+  @ApiPropertyOptional({ enum: ['USER', 'OFFICER', 'SUPERVISOR', 'ADMIN'] })
+  @IsOptional()
+  @IsIn(['USER', 'OFFICER', 'SUPERVISOR', 'ADMIN'])
+  category?: 'USER' | 'OFFICER' | 'SUPERVISOR' | 'ADMIN';
 }
 export class VehicleQuery {
-  @ApiProperty({ example: 'DEMO001' })
+  @ApiProperty({ example: 'ABC1234' })
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string'
       ? value.replace(/[\s-]/g, '').toUpperCase()
@@ -51,6 +60,7 @@ export class PageQuery {
   pageSize = 20;
 }
 export class OffenceQuery extends PageQuery {
+  @ApiPropertyOptional() @IsOptional() @IsString() @Length(0, 80) q?: string;
   @ApiPropertyOptional()
   @IsOptional()
   @IsIn(['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'CONFIRMED', 'CANCELLED'])
@@ -88,4 +98,14 @@ export class ReviewDto {
   @IsIn(['UNDER_REVIEW', 'CONFIRMED', 'CANCELLED'])
   status!: 'UNDER_REVIEW' | 'CONFIRMED' | 'CANCELLED';
   @ApiProperty() @IsString() @Length(3, 1000) @Matches(/\S/) notes!: string;
+}
+export class UpdateOffenceDto extends PartialType(
+  OmitType(CreateOffenceDto, ['requestKey', 'vehicleId'] as const),
+) {
+  @ApiProperty({
+    description: 'Current draft revision; stale edits return 409',
+  })
+  @IsInt()
+  @Min(0)
+  revision!: number;
 }

@@ -81,8 +81,19 @@ export class AuthController {
       user?.passwordHash ?? (await this.dummyHash),
       dto.password,
     );
-    if (!user || !valid || !user.active) {
-      await this.db.auditEvent.create({data: {action: 'LOGIN_FAILED', entityType: 'Authentication', entityId: 'staff-login'}});
+    if (
+      !user ||
+      !valid ||
+      !user.active ||
+      (dto.category && dto.category !== user.role)
+    ) {
+      await this.db.auditEvent.create({
+        data: {
+          action: 'LOGIN_FAILED',
+          entityType: 'Authentication',
+          entityId: 'staff-login',
+        },
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
     const token = randomBytes(32).toString('hex');

@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { addResponseContracts } from './response-contracts';
 
 export function configure(app: INestApplication) {
   app.use(helmet());
@@ -30,13 +31,14 @@ export function configure(app: INestApplication) {
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle('Smart Traffic — university demo')
+      .setTitle('ZRP Smart Traffic Management System')
       .setDescription(
-        'Fictional data only. Not valid for payment or enforcement.',
+        'Academic Prototype. Traffic management API; payments are simulated.',
       )
       .setVersion('0.1')
       .addBearerAuth()
       .build(),
   );
+  addResponseContracts(document);
   SwaggerModule.setup('api/docs', app, document);
 }

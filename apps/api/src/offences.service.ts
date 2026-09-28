@@ -7,7 +7,12 @@ import {
 import { OffenceStatus, Prisma } from '../generated/client';
 import { randomBytes } from 'crypto';
 import { Actor } from './auth';
-import { CreateOffenceDto, OffenceQuery, ReviewDto } from './dto';
+import {
+  CreateOffenceDto,
+  OffenceQuery,
+  ReviewDto,
+  UpdateOffenceDto,
+} from './dto';
 import { PrismaService } from './prisma.service';
 import { assignedSupervisor } from './operations.controller';
 
@@ -113,7 +118,30 @@ export class OffencesService {
 
   async list(actor: Actor, query: OffenceQuery) {
     const where: Prisma.OffenceWhereInput = {
-      AND: [scope(actor), query.status ? { status: query.status } : {}],
+      AND: [
+        scope(actor),
+        query.status ? { status: query.status } : {},
+        query.q
+          ? {
+              OR: [
+                { location: { contains: query.q, mode: 'insensitive' } },
+                {
+                  vehicle: {
+                    registrationNumber: {
+                      contains: query.q,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+                {
+                  ticket: {
+                    publicReference: { contains: query.q, mode: 'insensitive' },
+                  },
+                },
+              ],
+            }
+          : {},
+      ],
     };
     const [items, total] = await this.db.$transaction([
       this.db.offence.findMany({
@@ -147,6 +175,10 @@ export class OffencesService {
       if (offence.ticket) return offence.ticket;
       if (offence.status !== 'DRAFT')
         throw new ConflictException('Only drafts can be submitted');
+      if (!offence.category.active)
+        throw new ConflictException(
+          'Choose an active offence category before submitting',
+        );
       const ticket = await tx.ticket.create({
         data: {
           offenceId: id,
@@ -164,6 +196,93 @@ export class OffencesService {
         },
       });
       return ticket;
+    });
+  }
+
+  async update(actor: Actor, id: string, dto: UpdateOffenceDto) {
+    const { revision, ...changes } = dto;
+    if (!Object.keys(changes).length)
+      throw new BadRequestException('Provide a draft change');
+    if (
+      Object.entries(changes).some(
+        ([key, value]) =>
+          value === null && !['latitude', 'longitude'].includes(key),
+      )
+    )
+      throw new BadRequestException('Required draft fields cannot be null');
+    if (
+      'latitude' in changes !== 'longitude' in changes ||
+      (changes.latitude == null) !== (changes.longitude == null)
+    )
+      throw new BadRequestException('Provide both coordinates or neither');
+    if (
+      changes.observedAt &&
+      new Date(changes.observedAt).getTime() > Date.now() + 60000
+    )
+      throw new BadRequestException('Observation cannot be in the future');
+    return this.transaction(async (tx) => {
+      const draft = await tx.offence.findFirst({
+        where: { id, officerId: actor.id },
+      });
+      if (!draft) throw new NotFoundException('Record not found');
+      if (draft.status !== 'DRAFT' || draft.revision !== revision)
+        throw new ConflictException(
+          'Draft changed or was submitted. Refresh before editing.',
+        );
+      if (
+        changes.categoryId &&
+        !(await tx.offenceCategory.findFirst({
+          where: { id: changes.categoryId, active: true },
+        }))
+      )
+        throw new BadRequestException('Unknown or inactive category');
+      const result = await tx.offence.update({
+        where: { id },
+        data: { ...changes, revision: { increment: 1 } },
+        include: details,
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: actor.id,
+          action: 'DRAFT_UPDATED',
+          entityType: 'Offence',
+          entityId: id,
+          safeMetadata: {
+            fields: Object.keys(changes),
+            revision: result.revision,
+          },
+        },
+      });
+      return result;
+    });
+  }
+
+  async discard(actor: Actor, id: string) {
+    return this.transaction(async (tx) => {
+      const draft = await tx.offence.findFirst({
+        where: { id, officerId: actor.id },
+      });
+      if (!draft) throw new NotFoundException('Record not found');
+      if (
+        draft.status === 'CANCELLED' &&
+        !(await tx.ticket.findUnique({ where: { offenceId: id } }))
+      )
+        return draft;
+      if (draft.status !== 'DRAFT')
+        throw new ConflictException('Only drafts can be discarded');
+      const result = await tx.offence.update({
+        where: { id },
+        data: { status: 'CANCELLED', revision: { increment: 1 } },
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: actor.id,
+          action: 'DRAFT_DISCARDED',
+          entityType: 'Offence',
+          entityId: id,
+        },
+      });
+      return result;
     });
   }
 
