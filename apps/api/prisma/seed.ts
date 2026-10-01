@@ -24,134 +24,144 @@ async function seed() {
     'unassigned-supervisor': 'Inspector Farai Sibanda',
     admin: 'Nyasha Chirwa',
   };
-  await db.$transaction(async (tx) => {
-    if (production && (await tx.user.count()))
-      throw new Error('Production seed requires an empty user table');
-    for (const [local, role] of [
-      ['user', Role.USER],
-      ['officer', Role.OFFICER],
-      ['officer2', Role.OFFICER],
-      ['supervisor', Role.SUPERVISOR],
-      ['unassigned-supervisor', Role.SUPERVISOR],
-      ['admin', Role.ADMIN],
-    ] as const) {
-      const user = await tx.user.upsert({
-        where: { email: `${local}@demo.invalid` },
-        update: { passwordHash },
-        create: {
-          email: `${local}@demo.invalid`,
-          name: names[local],
-          role,
-          passwordHash,
-        },
-      });
-      await tx.session.deleteMany({ where: { userId: user.id } });
-      if (role === Role.OFFICER)
-        await tx.officerProfile.upsert({
-          where: { userId: user.id },
-          update: {},
+  await db.$transaction(
+    async (tx) => {
+      if (production && (await tx.user.count()))
+        throw new Error('Production seed requires an empty user table');
+      for (const [local, role] of [
+        ['user', Role.USER],
+        ['officer', Role.OFFICER],
+        ['officer2', Role.OFFICER],
+        ['supervisor', Role.SUPERVISOR],
+        ['unassigned-supervisor', Role.SUPERVISOR],
+        ['admin', Role.ADMIN],
+      ] as const) {
+        const user = await tx.user.upsert({
+          where: { email: `${local}@demo.invalid` },
+          update: { passwordHash },
           create: {
-            userId: user.id,
-            badgeNumber: local === 'officer' ? 'ZRP-1042' : 'ZRP-1043',
-            stationName: 'Harare Central',
+            email: `${local}@demo.invalid`,
+            name: names[local],
+            role,
+            passwordHash,
           },
         });
-    }
-    const supervisor = await tx.user.findUniqueOrThrow({
-      where: { email: 'supervisor@demo.invalid' },
-    });
-    const officer = await tx.user.findUniqueOrThrow({
-      where: { email: 'officer@demo.invalid' },
-    });
-    await tx.user.updateMany({
-      where: {
-        email: { in: ['officer@demo.invalid', 'officer2@demo.invalid'] },
-        supervisorId: null,
-        role: 'OFFICER',
-      },
-      data: { supervisorId: supervisor.id },
-    });
-    await tx.systemSetting.upsert({
-      where: { key: 'demo' },
-      create: { key: 'demo' },
-      update: {},
-    });
-    await tx.trafficAlert.upsert({
-      where: { id: 'd0000000-0000-4000-8000-000000000003' },
-      update: {},
-      create: {
-        id: 'd0000000-0000-4000-8000-000000000003',
-        title: 'Traffic Advisory',
-        message: 'Traffic information and road advisories will appear here.',
-        createdBy: supervisor.id,
-      },
-    });
-    await tx.incident.upsert({
-      where: { requestKey: 'd0000000-0000-4000-8000-000000000001' },
-      update: {},
-      create: {
-        requestKey: 'd0000000-0000-4000-8000-000000000001',
-        reportedBy: officer.id,
-        supervisorId: supervisor.id,
-        type: 'HAZARD',
-        description: 'Road obstruction reported near the intersection.',
-        location: 'Samora Machel Avenue, Harare',
-        latitude: -17.8253,
-        longitude: 31.0335,
-      },
-    });
-    await tx.checkpoint.upsert({
-      where: { id: 'd0000000-0000-4000-8000-000000000002' },
-      update: {},
-      create: {
-        id: 'd0000000-0000-4000-8000-000000000002',
-        name: 'Central Traffic Checkpoint',
-        location: 'Samora Machel Avenue, Harare',
-        latitude: -17.819,
-        longitude: 31.043,
-        startAt: new Date(Date.now() - 900000),
-        endAt: new Date(Date.now() + 86400000),
-        createdBy: supervisor.id,
-      },
-    });
-    const driver = await tx.driver.upsert({
-      where: { licenceNumber: 'L0001042' },
-      update: {},
-      create: {
-        fullName: 'Tawanda Ncube',
-        licenceNumber: 'L0001042',
-        licenceStatus: 'VALID',
-      },
-    });
-    await tx.vehicle.upsert({
-      where: { registrationNumber: 'ABC1234' },
-      update: {},
-      create: {
-        registrationNumber: 'ABC1234',
-        make: 'Toyota',
-        model: 'Corolla',
-        colour: 'Silver',
-        registrationStatus: 'REGISTERED',
-        driverId: driver.id,
-      },
-    });
-    await tx.offenceCategory.upsert({
-      where: { code: 'TRF-001' },
-      update: {},
-      create: {
-        code: 'TRF-001',
-        name: 'Traffic offence',
-        description: 'General traffic offence observation.',
-        demoFineAmount: '25.00',
-      },
-    });
-  });
+        await tx.session.deleteMany({ where: { userId: user.id } });
+        if (role === Role.OFFICER)
+          await tx.officerProfile.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: {
+              userId: user.id,
+              badgeNumber: local === 'officer' ? 'ZRP-1042' : 'ZRP-1043',
+              stationName: 'Harare Central',
+            },
+          });
+      }
+      const supervisor = await tx.user.findUniqueOrThrow({
+        where: { email: 'supervisor@demo.invalid' },
+      });
+      const officer = await tx.user.findUniqueOrThrow({
+        where: { email: 'officer@demo.invalid' },
+      });
+      await tx.user.updateMany({
+        where: {
+          email: { in: ['officer@demo.invalid', 'officer2@demo.invalid'] },
+          supervisorId: null,
+          role: 'OFFICER',
+        },
+        data: { supervisorId: supervisor.id },
+      });
+      await tx.systemSetting.upsert({
+        where: { key: 'demo' },
+        create: { key: 'demo' },
+        update: {},
+      });
+      await tx.trafficAlert.upsert({
+        where: { id: 'd0000000-0000-4000-8000-000000000003' },
+        update: {},
+        create: {
+          id: 'd0000000-0000-4000-8000-000000000003',
+          title: 'Traffic Advisory',
+          message: 'Traffic information and road advisories will appear here.',
+          createdBy: supervisor.id,
+        },
+      });
+      await tx.incident.upsert({
+        where: { requestKey: 'd0000000-0000-4000-8000-000000000001' },
+        update: {},
+        create: {
+          requestKey: 'd0000000-0000-4000-8000-000000000001',
+          reportedBy: officer.id,
+          supervisorId: supervisor.id,
+          type: 'HAZARD',
+          description: 'Road obstruction reported near the intersection.',
+          location: 'Samora Machel Avenue, Harare',
+          latitude: -17.8253,
+          longitude: 31.0335,
+        },
+      });
+      await tx.checkpoint.upsert({
+        where: { id: 'd0000000-0000-4000-8000-000000000002' },
+        update: {},
+        create: {
+          id: 'd0000000-0000-4000-8000-000000000002',
+          name: 'Central Traffic Checkpoint',
+          location: 'Samora Machel Avenue, Harare',
+          latitude: -17.819,
+          longitude: 31.043,
+          startAt: new Date(Date.now() - 900000),
+          endAt: new Date(Date.now() + 86400000),
+          createdBy: supervisor.id,
+        },
+      });
+      const driver = await tx.driver.upsert({
+        where: { licenceNumber: 'L0001042' },
+        update: {},
+        create: {
+          fullName: 'Tawanda Ncube',
+          licenceNumber: 'L0001042',
+          licenceStatus: 'VALID',
+        },
+      });
+      await tx.vehicle.upsert({
+        where: { registrationNumber: 'ABC1234' },
+        update: {},
+        create: {
+          registrationNumber: 'ABC1234',
+          make: 'Toyota',
+          model: 'Corolla',
+          colour: 'Silver',
+          registrationStatus: 'REGISTERED',
+          driverId: driver.id,
+        },
+      });
+      await tx.offenceCategory.upsert({
+        where: { code: 'TRF-001' },
+        update: {},
+        create: {
+          code: 'TRF-001',
+          name: 'Traffic offence',
+          description: 'General traffic offence observation.',
+          demoFineAmount: '25.00',
+        },
+      });
+    },
+    { timeout: 60000 },
+  );
   console.log(
     'Development accounts, ABC1234 and traffic category seeded. Existing records preserved; seeded account sessions revoked.',
   );
 }
 seed()
-  .catch(() => {
+  .catch((error: unknown) => {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String(error.code)
+        : 'UNKNOWN';
+    console.error(
+      `Seed error code: ${/^P\d{4}$/.test(code) ? code : 'UNKNOWN'}`,
+    );
     console.error(
       'Seed failed. Check database access and DEMO_PASSWORD (minimum 12 characters). Production requires ALLOW_DEMO_SEED=true and an empty user table.',
     );
