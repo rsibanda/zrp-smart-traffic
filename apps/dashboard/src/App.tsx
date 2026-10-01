@@ -1,4 +1,5 @@
 import { Field } from './Field';
+import { apiUrl, responseError, serviceUnavailable } from './api';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AdminPanel } from './AdminPanel';
 import { OperationsPanel } from './OperationsPanel';
@@ -45,7 +46,7 @@ export function App() {
     async (path: string, body?: unknown, method?: string) => {
       let response: Response;
       try {
-        response = await fetch(`/api/v1${path}`, {
+        response = await fetch(apiUrl(path), {
           method: method ?? (body === undefined ? 'GET' : 'POST'),
           headers: {
             'Content-Type': 'application/json',
@@ -55,7 +56,7 @@ export function App() {
           signal: AbortSignal.timeout(10000),
         });
       } catch {
-        throw new Error('API unavailable. Check your connection and retry.');
+        throw new Error(serviceUnavailable);
       }
       if (
         response.status === 401 &&
@@ -67,12 +68,7 @@ export function App() {
         setSelected(null);
       }
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(
-          [data.message ?? `Request failed (${response.status})`]
-            .flat()
-            .join('. '),
-        );
+        throw await responseError(response);
       }
       return response.status === 204 ? undefined : response.json();
     },

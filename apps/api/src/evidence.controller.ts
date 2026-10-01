@@ -16,8 +16,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
-import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
-import { resolve } from 'path';
+import { EvidenceStorage } from './evidence-storage';
+export { evidenceDirectory } from './evidence-storage';
 import { createHash, randomUUID } from 'crypto';
 import sharp from 'sharp';
 import { Roles, SessionGuard, StaffRequest } from './auth';
@@ -30,16 +30,15 @@ const publicFields = {
   byteSize: true,
   createdAt: true,
 } as const;
-export const evidenceDirectory = resolve(
-  __dirname,
-  '../../../.storage/evidence',
-);
 @ApiTags('Private evidence')
 @ApiBearerAuth()
 @UseGuards(SessionGuard)
 @Controller()
 export class EvidenceController {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly storage: EvidenceStorage,
+  ) {}
   @Get('offences/:id/evidence')
   @Roles('OFFICER', 'SUPERVISOR')
   async list(@Req() req: StaffRequest, @Param('id', ParseUUIDPipe) id: string) {
@@ -108,11 +107,9 @@ export class EvidenceController {
         'Invalid, oversized or unsupported image content',
       );
     }
-    await mkdir(evidenceDirectory, { recursive: true });
-    const key = `${randomUUID()}.jpg`;
-    const path = resolve(evidenceDirectory, key);
+    const objectKey = `${randomUUID()}.jpg`;
     const sha256 = createHash('sha256').update(bytes).digest('hex');
-    await writeFile(path, bytes, { flag: 'wx' });
+    const key = await this.storage.put(objectKey, bytes);
     let keep = false;
     try {
       const result = await serial(this.db, async (tx) => {
@@ -158,7 +155,7 @@ export class EvidenceController {
         createdAt: result.createdAt,
       };
     } finally {
-      if (!keep) await unlink(path).catch(() => undefined);
+      if (!keep) await this.storage.remove(key).catch(() => undefined);
     }
   }
   @Get('evidence/:id')
@@ -174,9 +171,7 @@ export class EvidenceController {
     if (!record) throw new NotFoundException('Evidence not found');
     let bytes: Buffer;
     try {
-      bytes = await readFile(
-        resolve(evidenceDirectory, record.privateStorageKey),
-      );
+      bytes = await this.storage.get(record.privateStorageKey);
     } catch {
       throw new NotFoundException('Evidence file unavailable');
     }

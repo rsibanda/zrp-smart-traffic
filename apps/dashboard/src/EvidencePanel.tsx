@@ -1,4 +1,5 @@
 import { Field } from './Field';
+import { apiFetch, responseError } from './api';
 import { FormEvent, useEffect, useState } from 'react';
 import { Api } from './AdminPanel';
 type Item = { id: string; byteSize: number; createdAt: string };
@@ -39,7 +40,7 @@ export function EvidencePanel({
     }
   }
   async function download(id: string) {
-    const response = await fetch(`/api/v1/evidence/${id}`, {
+    const response = await apiFetch(`/evidence/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(15000),
     });
@@ -57,15 +58,14 @@ export function EvidencePanel({
     const form = event.currentTarget;
     const data = new FormData(form);
     void perform(async () => {
-      const response = await fetch(`/api/v1/offences/${offenceId}/evidence`, {
+      const response = await apiFetch(`/offences/${offenceId}/evidence`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: data,
         signal: AbortSignal.timeout(20000),
       });
       if (!response.ok) {
-        const result = await response.json();
-        throw new Error([result.message].flat().join('. '));
+        throw await responseError(response);
       }
       setItems(await api(`/offences/${offenceId}/evidence`));
       form.reset();

@@ -247,6 +247,7 @@ const contracts: Record<string, SchemaObject> = {
     reference: text,
     verificationCode: text,
   }),
+  'get /health': object({ status: { type: 'string', enum: ['ok'] } }),
   'get /public/notices': object({
     warning: text,
     notice: text,

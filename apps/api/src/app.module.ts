@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { EvidenceStorage } from './evidence-storage';
+import { HealthController } from './health.controller';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthController, SessionGuard } from './auth';
 import { OffencesService } from './offences.service';
@@ -15,6 +17,7 @@ import { EvidenceController } from './evidence.controller';
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 5 }])],
   controllers: [
+    HealthController,
     AuthController,
     TrafficController,
     AdminController,
@@ -23,6 +26,6 @@ import { EvidenceController } from './evidence.controller';
     PublicManagementController,
     EvidenceController,
   ],
-  providers: [PrismaService, SessionGuard, OffencesService],
+  providers: [PrismaService, SessionGuard, OffencesService, EvidenceStorage],
 })
 export class AppModule {}

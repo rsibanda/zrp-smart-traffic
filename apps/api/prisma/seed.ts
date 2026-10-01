@@ -6,6 +6,9 @@ import * as argon2 from 'argon2';
 config({ path: resolve(__dirname, '../../../.env') });
 const db = new PrismaClient();
 async function seed() {
+  const production = process.env.NODE_ENV === 'production';
+  if (production && process.env.ALLOW_DEMO_SEED !== 'true')
+    throw new Error('Explicit ALLOW_DEMO_SEED=true required');
   const password = process.env.DEMO_PASSWORD;
   if (!password || password.length < 12)
     throw new Error(
@@ -22,6 +25,8 @@ async function seed() {
     admin: 'Nyasha Chirwa',
   };
   await db.$transaction(async (tx) => {
+    if (production && (await tx.user.count()))
+      throw new Error('Production seed requires an empty user table');
     for (const [local, role] of [
       ['user', Role.USER],
       ['officer', Role.OFFICER],
@@ -148,7 +153,7 @@ async function seed() {
 seed()
   .catch(() => {
     console.error(
-      'Seed failed. Check database access and DEMO_PASSWORD (minimum 12 characters).',
+      'Seed failed. Check database access and DEMO_PASSWORD (minimum 12 characters). Production requires ALLOW_DEMO_SEED=true and an empty user table.',
     );
     process.exitCode = 1;
   })
