@@ -1,6 +1,6 @@
 # GitHub + Netlify deployment
 
-Status: free hosting configuration tested locally; Neon database and private evidence bucket created. Render deployment awaits GitHub repository access. No updated public deployment has been verified.
+Status: free Render backend and Netlify frontend deployed. Hosted API workflows for all four roles passed. Browser-driven acceptance remains unverified.
 Destination team: https://app.netlify.com/teams/rsibanda
 Repository: https://github.com/rsibanda/zrp-smart-traffic
 
@@ -8,18 +8,34 @@ Repository: https://github.com/rsibanda/zrp-smart-traffic
 
 This section supersedes the historical progress entries below, including the paid disk proposal. The user selected free hosting; do not create paid compute, disks or upgrades.
 
-- **Database:** Neon Free project `zrp-smart-traffic` (`noisy-brook-51882053`), production branch `br-summer-art-b1guyqmt`, PostgreSQL 16 in Frankfurt. All six migrations applied. Demo accounts are not yet seeded.
+- **Database:** Neon Free project `zrp-smart-traffic` (`noisy-brook-51882053`), production branch `br-summer-art-b1guyqmt`, PostgreSQL 16 in Frankfurt. All six migrations applied. Fictional accounts seeded with a generated private password; no existing records reset.
 - **Evidence:** private Neon bucket `traffic-evidence`. The API supports `EVIDENCE_STORAGE=s3`; local development retains private filesystem storage. Server-side image validation, ownership checks and authenticated downloads remain in place. New remote storage keys have an `s3:` prefix; no schema change or existing evidence conversion was needed.
-- **Backend:** `render.yaml` selects Render Free without a disk. Render environment group `zrp-traffic-production` holds the database URL and branch-scoped storage credentials. No Render web service exists yet.
-- **Frontend:** reuse `https://thunderous-moxie-b0872a.netlify.app`. Set `VITE_API_URL` only after the backend is healthy, then rebuild. The updated frontend has not been published.
+- **Backend:** `https://zrp-traffic-api.onrender.com`, Render service `srv-davbkvou01pc73e51hbg`, Free without a disk. Render environment group `zrp-traffic-production` holds the database URL and branch-scoped storage credentials. `/health` returned HTTP 200 with `status: ok`.
+- **Frontend:** `https://thunderous-moxie-b0872a.netlify.app`. `VITE_API_URL` is the Render origin. Netlify successfully built and published commit `ec3bd5b` from `deployment/free-hosting`.
 
-The free Blueprint passes the billing constraint but Render still returns `branch main could not be found`. GitHub's main branch exists. Connect GitHub in the Render workspace and grant access to `rsibanda/zrp-smart-traffic`, then revalidate. Keep the repository private. Source changes still need a reviewed commit/push before deployment.
+GitHub access was granted and the free Blueprint validated. Deployment changes were committed and pushed to `deployment/free-hosting`; both hosts target this branch. Render automatic deployments are disabled; Netlify builds this production branch on pushes. The main branch and unrelated local UI/mobile changes were preserved. No paid resource was created.
 
-Validation: typecheck, lint, 45 API unit/configuration tests, 6 web tests, 18 local PostgreSQL integration tests and the API build passed. A synthetic object passed upload, authenticated read and anonymous-access rejection on the actual private bucket; only that synthetic object was removed. Hosted API authentication, all four role workflows, CORS and redeployment persistence remain pending.
+Validation: typecheck, lint, 45 API unit/configuration tests, 6 web tests, 18 local PostgreSQL integration tests and the API build passed. `scripts/check-hosted-deployment.mjs` passed against the live API: four-role authentication, invalid login rejection, role boundaries, vehicle lookup/no-result, authenticated evidence upload/download and anonymous denial, idempotent ticket creation, assigned supervisor review, motorist two-factor ticket verification, payment simulation, allowed/disallowed CORS and logout invalidation. One clearly labelled fictional ticket and synthetic evidence image remain for inspection. No hosted reset or destructive test was run.
+
+Deployment fixes: removed the Windows UTF-8 BOM from netlify.toml, redeployed after the Render environment group was linked, and extended the seed transaction timeout to 60 seconds for the remote connection. The production seed still refuses a nonempty user table. Its safe error reporting prints only a Prisma error code, never credentials.
+
+Automatic approval review blocked launching headless Chrome with the reason "blocked by policy". Browser-driven sign-in and visual acceptance therefore remain unverified; passing API checks must not be described as passing browser tests.
+
+Post-deploy checks: private evidence uploaded before the backend redeploy remained downloadable afterward (HTTP 200, JPEG). Netlify initially inherited team-login protection; the project-specific setting was disabled to fulfil the requested public deployment. Application authentication and API role guards remain active. Public `/` and `/admin` now return HTTP 200, and the published JavaScript contains the correct HTTPS API origin. A focused bundle scan found no database URL/provider-token patterns; this is not a comprehensive security audit.
 
 Free-tier limits apply: [Render Free](https://render.com/docs/free) services spin down after inactivity, so a cold start may exceed the browser request timeout and require retrying. [Neon pricing](https://neon.com/pricing) currently includes 5 GB object storage per free project; monitor provider quotas and keep this a small fictional demo. Do not silently upgrade when limits are reached. Back up database records and corresponding private objects together; no automatic retention job is configured.
 
-Next: grant Render repository access, push the reviewed deployment source, create the free backend linked to its environment group, bootstrap fictional accounts explicitly, verify `/health`, configure Netlify's API origin and verify hosted role workflows.
+### Demo sign-in
+
+Use `officer@demo.invalid`, `supervisor@demo.invalid`, or `user@demo.invalid` with the matching login category. Use `admin@demo.invalid` at `/admin`. The generated shared demo password is in this Windows user's `ZRP_DEMO_PASSWORD` environment variable, not in source, reports or Netlify. To copy it without printing it, run locally:
+
+```powershell
+[Environment]::GetEnvironmentVariable('ZRP_DEMO_PASSWORD', 'User') | Set-Clipboard
+```
+
+Paste it into the password field and clear the clipboard after use. These accounts are for this fictional university demo only.
+
+To rerun the hosted API smoke check, set `DEPLOYMENT_API_URL` to the Render origin and load `ZRP_DEMO_PASSWORD` from the User environment into the process. Run `node scripts/check-hosted-deployment.mjs`. Each run creates one clearly labelled fictional ticket and retains it; it never resets the hosted database.
 
 ## Assessment and strategy
 

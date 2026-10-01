@@ -10,7 +10,7 @@ This is an academic prototype using fictional records. It is not an official ZRP
 
 1. `AGENTS.md` — project requirements, security boundaries and working rules.
 2. `README.md` — setup, current features and role workflows.
-3. `DEPLOYMENT.md` — hosting configuration and chronological deployment updates. Later updates supersede earlier status statements; verify live state before acting.
+3. `DEPLOYMENT.md` — read the current status at the top first; historical entries below may be superseded. Verify live state before acting.
 4. `docs/decisions.md`, `docs/02-requirements.md`, `docs/03-architecture.md`, `docs/04-testing-and-evaluation.md` and `docs/api.md`.
 5. Relevant source, migrations, tests and any supplied university rubric. Do not assume a rubric exists.
 
@@ -173,6 +173,8 @@ After each increment, report files changed, functionality added/fixed, commands 
 If external access blocks deployment, finish independent code/documentation work and request only the missing access or decision. Never fabricate credentials, official integrations, test results or deployed URLs.
 
 ## Current free deployment handoff — 1 October 2026
+
+**Latest status:** deployed to `https://thunderous-moxie-b0872a.netlify.app` and `https://zrp-traffic-api.onrender.com` from `deployment/free-hosting`, application commit `ec3bd5b`. Accounts are seeded and all four hosted API role workflows passed. The private evidence adapter is active. The access blockers described in the historical paragraphs below are resolved. Generated demo password is in Windows User environment `ZRP_DEMO_PASSWORD`; follow DEPLOYMENT.md to copy it without printing. Browser-driven acceptance remains unverified because automatic approval review blocked launching headless Chrome. Do not rerun the production seed or reset hosted data.
 
 The user rejected paid Render compute/disk. Use `render.yaml` with `plan: free`, no disk, and private Neon object storage through `EvidenceStorage`. Local evidence storage remains the development default. This supersedes any earlier paid-disk plan or missing-credential status in this handoff.
 
