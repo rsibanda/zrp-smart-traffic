@@ -174,6 +174,8 @@ If external access blocks deployment, finish independent code/documentation work
 
 ## Current free deployment handoff — 1 October 2026
 
+**2 October update:** application commit `4b480e2` is now live on Render and Netlify, including citation and motorist payment interfaces. All seven migrations are applied, existing accounts/data preserved, and all four role HTTP/API login checks passed with Netlify CORS. Run `scripts/check-hosted-login.mjs` with the environment described in DEPLOYMENT.md for a read-only login check. Do not reseed production. Browser-driven acceptance remains unverified.
+
 **Latest status:** deployed to `https://thunderous-moxie-b0872a.netlify.app` and `https://zrp-traffic-api.onrender.com` from `deployment/free-hosting`, application commit `ec3bd5b`. Accounts are seeded and all four hosted API role workflows passed. The private evidence adapter is active. The access blockers described in the historical paragraphs below are resolved. Generated demo password is in Windows User environment `ZRP_DEMO_PASSWORD`; follow DEPLOYMENT.md to copy it without printing. Browser-driven acceptance remains unverified because automatic approval review blocked launching headless Chrome. Do not rerun the production seed or reset hosted data.
 
 The user rejected paid Render compute/disk. Use `render.yaml` with `plan: free`, no disk, and private Neon object storage through `EvidenceStorage`. Local evidence storage remains the development default. This supersedes any earlier paid-disk plan or missing-credential status in this handoff.

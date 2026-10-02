@@ -4,6 +4,28 @@ Status: free Render backend and Netlify frontend deployed. Hosted API workflows 
 Destination team: https://app.netlify.com/teams/rsibanda
 Repository: https://github.com/rsibanda/zrp-smart-traffic
 
+## Latest deployment and login check — 2 October 2026
+
+Published application commit `4b480e2` from `deployment/free-hosting` to both hosts. Render deployment `dep-davvlpnavr4c73djbuu0` is live; Netlify deployment `6abffb5ece01f1fe2c46ee86` is ready. The newer citation terminal and motorist account/payment screens are now included. Hosting remains free.
+
+Migration `20261002140000_motorist_payments` passed first on the isolated Neon copy `verify-motorist-payments-20261002` (`br-cold-shape-b1gaiui2`, expires 3 October), then on production. All seven migrations are applied. The six existing accounts, one ticket, one offence and one evidence record were preserved. No reseeding, password changes or hosted data reset occurred. New ownership links and sample categories can be managed through the administrator interface; local demonstration records were not copied into hosting.
+
+Validation this release: typecheck, lint, 47 API tests, 9 web tests, 31 local PostgreSQL integration tests and API/web production builds passed. The first integration attempt could not reach the stopped local database; after starting it, all 31 passed. Local Prisma client regeneration initially hit a Windows DLL file lock; typechecking/builds used the existing matching client, and Render's clean Linux generation/build succeeded.
+
+`scripts/check-hosted-login.mjs` passed against the live API with the Netlify Origin: ADMIN, OFFICER, SUPERVISOR and USER sign-in, matching profile and dashboard APIs, restricted endpoint rejection, logout invalidation, and invalid-password rejection. Public `/` and `/admin` returned HTTP 200; the published bundle contains the new motorist dashboard and correct Render API URL. Credentials were read only from the Windows User environment and never printed. This verifies HTTP/API login, not browser interaction; the earlier headless Chrome policy block remains the browser-testing limitation.
+
+To rerun without creating demo records:
+
+```powershell
+$env:DEPLOYMENT_API_URL = 'https://zrp-traffic-api.onrender.com'
+$env:DEPLOYMENT_WEB_URL = 'https://thunderous-moxie-b0872a.netlify.app'
+$env:ZRP_DEMO_PASSWORD = [Environment]::GetEnvironmentVariable('ZRP_DEMO_PASSWORD', 'User')
+node scripts/check-hosted-login.mjs
+Remove-Item Env:ZRP_DEMO_PASSWORD
+```
+
+Allow at least one minute between login test runs to respect the login rate limit. Demo account names and password-copy instructions are below.
+
 ## Current free hosting plan — 1 October 2026
 
 This section supersedes the historical progress entries below, including the paid disk proposal. The user selected free hosting; do not create paid compute, disks or upgrades.
