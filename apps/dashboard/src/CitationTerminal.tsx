@@ -1,0 +1,301 @@
+import { useEffect, useRef, useState } from 'react';
+import { Field } from './Field';
+import { EvidencePanel } from './EvidencePanel';
+import { AccountApi } from './MotoristDashboard';
+type Category = {
+  id: string;
+  name: string;
+  demoFineAmount: string;
+  demeritPoints: number;
+  paymentDueDays: number;
+};
+type Vehicle = {
+  id: string;
+  registrationNumber: string;
+  make: string;
+  model: string;
+  motoristId: string | null;
+  driver: { fullName: string; licenceStatus: string } | null;
+};
+export function CitationTerminal({
+  api,
+  token,
+}: {
+  api: AccountApi;
+  token: string;
+}) {
+  const [categories, setCategories] = useState<Category[]>([]),
+    [category, setCategory] = useState('');
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null),
+    [registration, setRegistration] = useState('');
+  const [draft, setDraft] = useState<{ id: string } | null>(null),
+    [ticket, setTicket] = useState<{
+      id: string;
+      publicReference: string;
+      demoFineAmountSnapshot: string;
+    } | null>(null);
+  const [code, setCode] = useState(''),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(false),
+    [uncertain, setUncertain] = useState(false);
+  const pending = useRef<unknown>(null);
+  const preview = useRef<HTMLDialogElement>(null);
+  const selected = categories.find((c) => c.id === category);
+  useEffect(() => {
+    let active = true;
+    void api('/offence-categories')
+      .then((data) => {
+        if (active) {
+          setCategories(data);
+          setCategory(data[0]?.id ?? '');
+        }
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]);
+  async function perform(work: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await work();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="citation-terminal">
+      <span className="eyebrow">OFFICER CITATION TERMINAL</span>
+      <h2>Issue Traffic Infringement</h2>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void perform(async () => {
+            const data = await api(
+              `/vehicles?registration=${encodeURIComponent(registration)}`,
+            );
+            setVehicle(data.items[0] ?? null);
+            if (!data.items.length) setError('No matching records.');
+          });
+        }}
+      >
+        <div className="form-grid">
+          <Field>
+            Vehicle registration
+            <input
+              value={registration}
+              onChange={(e) => {
+                setRegistration(e.target.value);
+                setVehicle(null);
+              }}
+              placeholder="ABC1234"
+              required
+              disabled={busy || !!draft || uncertain}
+            />
+          </Field>
+          <button disabled={busy || !!draft || uncertain}>
+            Lookup vehicle
+          </button>
+        </div>
+      </form>
+      {vehicle && (
+        <>
+          <div className="vehicle-summary">
+            <h3>
+              {vehicle.registrationNumber} · {vehicle.make} {vehicle.model}
+            </h3>
+            <p>
+              {vehicle.driver?.fullName ?? 'Driver not recorded'} · Licence:{' '}
+              {vehicle.driver?.licenceStatus ?? 'Not recorded'}
+            </p>
+            <p>
+              {vehicle.motoristId
+                ? 'Motorist account linked'
+                : 'Account not linked. Provide a ticket verification code after issue.'}
+            </p>
+          </div>
+          {!ticket && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const data = new FormData(e.currentTarget);
+                if (!pending.current)
+                  pending.current = {
+                    requestKey: crypto.randomUUID(),
+                    vehicleId: vehicle.id,
+                    categoryId: category,
+                    location: data.get('location'),
+                    notes: data.get('notes'),
+                    observedAt: new Date().toISOString(),
+                  };
+                void perform(async () => {
+                  setUncertain(true);
+                  const result = await api('/offences', pending.current);
+                  setDraft(result);
+                  setUncertain(false);
+                  preview.current?.showModal();
+                });
+              }}
+            >
+              <fieldset disabled={busy || !!draft || uncertain}>
+                <div className="form-grid">
+                  <Field>
+                    Offence category
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      required
+                    >
+                      {categories.map((c) => (
+                        <option value={c.id} key={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field>
+                    Location
+                    <input
+                      name="location"
+                      required
+                      minLength={3}
+                      maxLength={200}
+                      placeholder="Street or intersection"
+                    />
+                  </Field>
+                  <Field>
+                    Officer notes
+                    <textarea
+                      name="notes"
+                      required
+                      minLength={3}
+                      maxLength={2000}
+                      placeholder="Record the observed facts"
+                    />
+                  </Field>
+                </div>
+              </fieldset>
+              <p>
+                Fine: <strong>{selected?.demoFineAmount} units</strong> ·
+                Demerit points: <strong>{selected?.demeritPoints ?? 0}</strong>{' '}
+                · Due within {selected?.paymentDueDays ?? 30} days
+              </p>
+              <p className="muted">
+                Configured academic reference values. Observation time is
+                recorded when the draft is saved.
+              </p>
+              {!draft ? (
+                <button disabled={busy}>
+                  {uncertain ? 'Retry same draft' : 'Review Infringement'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => preview.current?.showModal()}
+                >
+                  Review saved draft
+                </button>
+              )}
+            </form>
+          )}
+          {draft && !ticket && (
+            <EvidencePanel
+              api={api}
+              token={token}
+              offenceId={draft.id}
+              draft={true}
+              officer={true}
+            />
+          )}
+        </>
+      )}
+      {ticket && (
+        <div role="status">
+          <h3>Infringement issued</h3>
+          <p className="reference">{ticket.publicReference}</p>
+          <p>Amount: {ticket.demoFineAmountSnapshot} units</p>
+          <button
+            disabled={busy}
+            onClick={() =>
+              void perform(async () => {
+                const result = await api(
+                  `/tickets/${ticket.id}/access-code`,
+                  {},
+                );
+                setCode(result.verificationCode);
+              })
+            }
+          >
+            Generate verification code
+          </button>
+          {code && (
+            <p>
+              Give this code to the motorist: <strong>{code}</strong>
+            </p>
+          )}
+          <button
+            className="secondary"
+            onClick={() => {
+              setTicket(null);
+              setDraft(null);
+              setVehicle(null);
+              setCode('');
+              pending.current = null;
+            }}
+          >
+            New infringement
+          </button>
+        </div>
+      )}
+      <dialog ref={preview} aria-labelledby="citation-confirm">
+        <h2 id="citation-confirm">Issue this infringement?</h2>
+        <p>
+          {vehicle?.registrationNumber} · {selected?.name}
+        </p>
+        <p>
+          {selected?.demoFineAmount} units · {selected?.demeritPoints ?? 0}{' '}
+          points
+        </p>
+        <p>
+          {vehicle?.motoristId
+            ? 'Motorist account linked'
+            : 'Ticket verification required to link an account.'}
+        </p>
+        {error && <p role="alert">{error}</p>}
+        <div className="card-actions">
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => preview.current?.close()}
+          >
+            Cancel
+          </button>
+          <button
+            disabled={busy}
+            onClick={() =>
+              void perform(async () => {
+                const result = await api(`/offences/${draft!.id}/submit`, {});
+                setTicket(result);
+                preview.current?.close();
+              })
+            }
+          >
+            Issue Infringement
+          </button>
+        </div>
+      </dialog>
+    </section>
+  );
+}

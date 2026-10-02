@@ -13,7 +13,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiProperty } from '@nestjs/swagger';
+import { IsEmail, Matches } from 'class-validator';
 import * as argon2 from 'argon2';
 import { Prisma } from '../generated/client';
 import { publicUser, Roles, SessionGuard, StaffRequest } from './auth';
@@ -33,6 +34,10 @@ const accountFields = {
   supervisorId: true,
   createdAt: true,
 } as const;
+export class MotoristLinkDto {
+  @ApiProperty() @Matches(/^[A-Z0-9]{3,16}$/) registration!: string;
+  @ApiProperty() @IsEmail() email!: string;
+}
 @ApiTags('Administration')
 @ApiBearerAuth()
 @UseGuards(SessionGuard)
@@ -40,6 +45,43 @@ const accountFields = {
 @Controller('admin')
 export class AdminController {
   constructor(private readonly db: PrismaService) {}
+  @Post('motorist-links')
+  link(@Req() req: StaffRequest, @Body() dto: MotoristLinkDto) {
+    return serial(this.db, async (tx) => {
+      const user = await tx.user.findFirst({
+        where: { email: dto.email.toLowerCase(), role: 'USER', active: true },
+      });
+      const vehicle = await tx.vehicle.findUnique({
+        where: { registrationNumber: dto.registration },
+      });
+      if (!user || !vehicle)
+        throw new BadRequestException(
+          'Select an existing vehicle and active motorist account.',
+        );
+      await tx.vehicle.update({
+        where: { id: vehicle.id },
+        data: { motoristId: user.id },
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: req.actor.id,
+          action: 'VEHICLE_MOTORIST_LINKED',
+          entityType: 'Vehicle',
+          entityId: vehicle.id,
+          safeMetadata: {
+            previousMotoristId: vehicle.motoristId,
+            motoristId: user.id,
+          },
+        },
+      });
+      return {
+        registration: vehicle.registrationNumber,
+        motorist: user.name,
+        message:
+          'Vehicle linked. Existing tickets retain their recorded owner.',
+      };
+    });
+  }
   @Get('users')
   async users(@Query() query: SearchQuery) {
     const where: Prisma.UserWhereInput = query.q

@@ -45,6 +45,9 @@ model User {
   checkpoints Checkpoint[]
   alerts TrafficAlert[]
   uploads Evidence[]
+  vehicles Vehicle[] @relation("MotoristVehicles")
+  motoristTickets Ticket[] @relation("MotoristTickets")
+  payments Payment[]
 }
 model OfficerProfile {
   id String @id @default(uuid()) @db.Uuid
@@ -80,6 +83,9 @@ model Vehicle {
   driverId String? @db.Uuid
   driver Driver? @relation(fields: [driverId], references: [id])
   offences Offence[]
+  motoristId String? @db.Uuid
+  motorist User? @relation("MotoristVehicles", fields: [motoristId], references: [id])
+  @@index([motoristId])
 }
 model OffenceCategory {
   id String @id @default(uuid()) @db.Uuid
@@ -88,6 +94,8 @@ model OffenceCategory {
   description String
   demoFineAmount Decimal @db.Decimal(10, 2)
   active Boolean @default(true)
+  demeritPoints Int @default(0)
+  paymentDueDays Int @default(30)
   offences Offence[]
 }
 model Offence {
@@ -125,6 +133,46 @@ model Ticket {
   status TicketStatus @default(ISSUED)
   issuedAt DateTime @default(now())
   publicAccess PublicTicketAccess?
+  motoristId String? @db.Uuid
+  motorist User? @relation("MotoristTickets", fields: [motoristId], references: [id])
+  demeritPointsSnapshot Int @default(0)
+  dueAt DateTime?
+  payments Payment[]
+  @@index([motoristId, issuedAt])
+}
+enum PaymentMethod {
+  LEGACY
+  ECOCASH
+  INNBUCKS
+  CARD
+}
+enum PaymentStatus {
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+  TIMED_OUT
+}
+model Payment {
+  id String @id @default(uuid()) @db.Uuid
+  paymentReference String @unique
+  requestKey String @unique @db.Uuid
+  ticketId String @db.Uuid
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  motoristId String @db.Uuid
+  motorist User @relation(fields: [motoristId], references: [id])
+  amount Decimal @db.Decimal(10, 2)
+  currency String @default("UNITS")
+  method PaymentMethod
+  status PaymentStatus @default(PROCESSING)
+  last4 String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  paidAt DateTime?
+  receiptReference String? @unique
+  failureReason String?
+  @@index([motoristId, createdAt])
+  @@index([ticketId, status])
 }
 model AuditEvent {
   id String @id @default(uuid()) @db.Uuid

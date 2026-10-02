@@ -27,6 +27,7 @@ export default defineConfig(({ command, mode }) => {
       proxy: { '/api': 'http://127.0.0.1:3000' },
     },
     test: {
+      setupFiles: ['./src/test-setup.ts'],
       environment: 'jsdom',
       clearMocks: true,
       pool: 'threads',

@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
+  IsInt,
   IsEmail,
   IsIn,
   IsISO8601,
@@ -36,6 +37,18 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() active?: boolean;
 }
 export class CategoryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  demeritPoints?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  paymentDueDays?: number;
   @ApiProperty() @Matches(/^[A-Z0-9-]{3,20}$/) code!: string;
   @ApiProperty() @IsString() @Length(3, 100) @Matches(/\S/) name!: string;
   @ApiProperty() @IsString() @Length(3, 1000) description!: string;

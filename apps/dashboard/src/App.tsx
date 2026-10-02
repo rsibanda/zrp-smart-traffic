@@ -3,7 +3,8 @@ import { apiUrl, responseError, serviceUnavailable } from './api';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AdminPanel } from './AdminPanel';
 import { OperationsPanel } from './OperationsPanel';
-import { PublicPortal } from './PublicPortal';
+import { MotoristDashboard } from './MotoristDashboard';
+import { CitationTerminal } from './CitationTerminal';
 import { EvidencePanel } from './EvidencePanel';
 import { roleLabel, statusLabel, StatusBadge } from './presentation';
 
@@ -13,6 +14,7 @@ type User = {
   role: 'USER' | 'OFFICER' | 'SUPERVISOR' | 'ADMIN';
 };
 type Offence = {
+  paymentStatus?: string | null;
   id: string;
   location: string;
   notes: string;
@@ -25,6 +27,7 @@ type Offence = {
     publicReference: string;
     demoFineAmountSnapshot: string;
     status: string;
+    payments?: { method: string; status: string; paidAt: string | null }[];
   };
 };
 type Session = { token: string; user: User };
@@ -41,6 +44,7 @@ export function App() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('');
   const [search, setSearch] = useState('');
   const api = useCallback(
     async (path: string, body?: unknown, method?: string) => {
@@ -89,10 +93,15 @@ export function App() {
       if (active) setLoading(true);
       try {
         const data = await api(
-          `/offences?page=${page}&pageSize=20&q=${encodeURIComponent(search)}${status ? `&status=${status}` : ''}`,
+          `/offences?page=${page}&pageSize=20&q=${encodeURIComponent(search)}${status ? `&status=${status}` : ''}${paymentStatus ? `&paymentStatus=${paymentStatus}` : ''}`,
         );
         if (active) {
           setItems(data.items);
+          setSelected((old) =>
+            old
+              ? (data.items.find((item: Offence) => item.id === old.id) ?? old)
+              : null,
+          );
           setTotal(data.total);
           setError('');
         }
@@ -108,7 +117,7 @@ export function App() {
       active = false;
       clearInterval(timer);
     };
-  }, [api, session, page, status, search]);
+  }, [api, session, page, status, search, paymentStatus]);
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -253,7 +262,9 @@ export function App() {
             </form>
           </section>
         ) : session.user.role === 'USER' ? (
-          <PublicPortal
+          <MotoristDashboard
+            api={api}
+            user={session.user}
             accountToken={session.token}
             onSessionExpired={() => {
               setSession(null);
@@ -264,6 +275,9 @@ export function App() {
           <AdminPanel api={api} />
         ) : (
           <>
+            {session.user.role === 'OFFICER' && (
+              <CitationTerminal api={api} token={session.token} />
+            )}
             <OperationsPanel api={api} user={session.user} />
             <section>
               <h2>
@@ -311,6 +325,23 @@ export function App() {
                     }}
                   />
                 </Field>
+                <Field>
+                  Payment status
+                  <select
+                    value={paymentStatus}
+                    onChange={(e) => {
+                      setPaymentStatus(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="">All payments</option>
+                    {['PENDING', 'PAID', 'OVERDUE', 'FAILED'].map((s) => (
+                      <option value={s} key={s}>
+                        {statusLabel(s)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
               </div>
               <div
                 className="table-wrap"
@@ -324,6 +355,7 @@ export function App() {
                       <th>Vehicle registration</th>
                       <th>Category</th>
                       <th>Status</th>
+                      <th>Payment</th>
                       <th className="action-column">Actions</th>
                     </tr>
                   </thead>
@@ -334,6 +366,13 @@ export function App() {
                         <td>{item.category.name}</td>
                         <td>
                           <StatusBadge value={item.status} />
+                        </td>
+                        <td>
+                          {item.paymentStatus ? (
+                            <StatusBadge value={item.paymentStatus} />
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td>
                           <button
@@ -464,6 +503,22 @@ export function App() {
                   <div className="ticket">
                     <h3>Traffic ticket</h3>
                     <p>Reference: {selected.ticket.publicReference}</p>
+                    {selected.paymentStatus && (
+                      <p>
+                        Payment: <StatusBadge value={selected.paymentStatus} />
+                      </p>
+                    )}
+                    {selected.ticket.payments?.[0] && (
+                      <p>
+                        Method:{' '}
+                        {statusLabel(selected.ticket.payments[0].method)} ·{' '}
+                        {selected.ticket.payments[0].paidAt
+                          ? new Date(
+                              selected.ticket.payments[0].paidAt,
+                            ).toLocaleString()
+                          : statusLabel(selected.ticket.payments[0].status)}
+                      </p>
+                    )}
                     <p>
                       Amount: {selected.ticket.demoFineAmountSnapshot} ·{' '}
                       <StatusBadge value={selected.ticket.status} />

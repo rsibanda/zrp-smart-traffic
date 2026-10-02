@@ -51,7 +51,8 @@ export function PublicPortal({
       throw new Error(serviceUnavailable);
     }
     if (!response.ok) {
-      if (response.status === 401 && !access) onSessionExpired();
+      if (response.status === 401 && !access && path !== '/tickets/verify')
+        onSessionExpired();
       if (response.status === 401 && access) {
         setToken('');
         setTicket(null);

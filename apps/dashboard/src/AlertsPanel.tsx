@@ -1,3 +1,4 @@
+import { StatusBadge } from './presentation';
 import { Field } from './Field';
 import { FormEvent, useEffect, useState } from 'react';
 import { Api } from './AdminPanel';
@@ -50,12 +51,12 @@ export function AlertsPanel({ api, userId }: { api: Api; userId: string }) {
           {error}
         </p>
       )}
-      <ul>
+      <ul className="record-list">
         {alerts.length === 0 && <li>No traffic notices available.</li>}
         {alerts.map((alert) => (
           <li key={alert.id}>
             <strong>{alert.title}</strong> ·{' '}
-            {alert.active ? 'Published' : 'Withdrawn'}
+            <StatusBadge value={alert.active ? 'PUBLISHED' : 'WITHDRAWN'} />
             <p>{alert.message}</p>
             {alert.createdBy === userId && (
               <button

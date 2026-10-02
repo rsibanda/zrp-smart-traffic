@@ -60,6 +60,10 @@ export class PageQuery {
   pageSize = 20;
 }
 export class OffenceQuery extends PageQuery {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsIn(['PENDING', 'PAID', 'OVERDUE', 'FAILED'])
+  paymentStatus?: 'PENDING' | 'PAID' | 'OVERDUE' | 'FAILED';
   @ApiPropertyOptional() @IsOptional() @IsString() @Length(0, 80) q?: string;
   @ApiPropertyOptional()
   @IsOptional()

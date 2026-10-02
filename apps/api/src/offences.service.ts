@@ -15,6 +15,7 @@ import {
 } from './dto';
 import { PrismaService } from './prisma.service';
 import { assignedSupervisor } from './operations.controller';
+import { effectivePaymentStatus } from './payments.service';
 
 export function scope(actor: Actor): Prisma.OffenceWhereInput {
   if (actor.role === 'OFFICER') return { officerId: actor.id };
@@ -29,7 +30,20 @@ export function canTransition(from: OffenceStatus, to: OffenceStatus) {
     (from === 'UNDER_REVIEW' && (to === 'CONFIRMED' || to === 'CANCELLED'))
   );
 }
-const details = { vehicle: true, category: true, ticket: true } as const;
+const details = {
+  vehicle: true,
+  category: true,
+  ticket: {
+    include: {
+      publicAccess: { select: { paidAt: true, receiptReference: true } },
+      payments: {
+        select: { method: true, status: true, paidAt: true },
+        orderBy: { createdAt: 'desc' as const },
+        take: 1,
+      },
+    },
+  },
+} as const;
 
 @Injectable()
 export class OffencesService {
@@ -121,6 +135,48 @@ export class OffencesService {
       AND: [
         scope(actor),
         query.status ? { status: query.status } : {},
+        query.paymentStatus === 'PAID'
+          ? { ticket: { publicAccess: { paidAt: { not: null } } } }
+          : {},
+        query.paymentStatus === 'OVERDUE'
+          ? {
+              ticket: {
+                status: 'ISSUED',
+                dueAt: { lt: new Date() },
+                OR: [
+                  { publicAccess: null },
+                  { publicAccess: { paidAt: null } },
+                ],
+              },
+            }
+          : {},
+        query.paymentStatus === 'PENDING'
+          ? {
+              ticket: {
+                status: 'ISSUED',
+                AND: [
+                  { OR: [{ dueAt: null }, { dueAt: { gte: new Date() } }] },
+                  {
+                    OR: [
+                      { publicAccess: null },
+                      { publicAccess: { paidAt: null } },
+                    ],
+                  },
+                ],
+              },
+            }
+          : {},
+        query.paymentStatus === 'FAILED'
+          ? {
+              ticket: {
+                payments: { some: { status: { in: ['FAILED', 'TIMED_OUT'] } } },
+                OR: [
+                  { publicAccess: null },
+                  { publicAccess: { paidAt: null } },
+                ],
+              },
+            }
+          : {},
         query.q
           ? {
               OR: [
@@ -153,7 +209,15 @@ export class OffencesService {
       }),
       this.db.offence.count({ where }),
     ]);
-    return { items, total, page: query.page, pageSize: query.pageSize };
+    return {
+      items: items.map((item) => ({
+        ...item,
+        paymentStatus: item.ticket ? effectivePaymentStatus(item.ticket) : null,
+      })),
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
   }
 
   async get(actor: Actor, id: string) {
@@ -162,7 +226,12 @@ export class OffencesService {
       include: details,
     });
     if (!offence) throw new NotFoundException('Record not found');
-    return offence;
+    return {
+      ...offence,
+      paymentStatus: offence.ticket
+        ? effectivePaymentStatus(offence.ticket)
+        : null,
+    };
   }
 
   async submit(actor: Actor, id: string) {
@@ -184,6 +253,11 @@ export class OffencesService {
           offenceId: id,
           publicReference: randomBytes(24).toString('hex'),
           demoFineAmountSnapshot: offence.category.demoFineAmount,
+          motoristId: offence.vehicle.motoristId,
+          demeritPointsSnapshot: offence.category.demeritPoints,
+          dueAt: new Date(
+            Date.now() + offence.category.paymentDueDays * 86400000,
+          ),
         },
       });
       await tx.offence.update({ where: { id }, data: { status: 'SUBMITTED' } });

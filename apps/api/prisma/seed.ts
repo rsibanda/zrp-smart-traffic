@@ -124,6 +124,9 @@ async function seed() {
           licenceStatus: 'VALID',
         },
       });
+      const motorist = await tx.user.findUniqueOrThrow({
+        where: { email: 'user@demo.invalid' },
+      });
       await tx.vehicle.upsert({
         where: { registrationNumber: 'ABC1234' },
         update: {},
@@ -134,7 +137,18 @@ async function seed() {
           colour: 'Silver',
           registrationStatus: 'REGISTERED',
           driverId: driver.id,
+          motoristId: motorist.id,
         },
+      });
+      // Only the explicitly identified synthetic development vehicle is linked;
+      // never infer ownership by name or overwrite an administrator's assignment.
+      await tx.vehicle.updateMany({
+        where: {
+          registrationNumber: 'ABC1234',
+          driverId: driver.id,
+          motoristId: null,
+        },
+        data: { motoristId: motorist.id },
       });
       await tx.offenceCategory.upsert({
         where: { code: 'TRF-001' },
@@ -146,6 +160,28 @@ async function seed() {
           demoFineAmount: '25.00',
         },
       });
+      for (const [code, name, amount, points] of [
+        ['TRF-SPD', 'Speeding', 150, 3],
+        ['TRF-SIG', 'Failure to obey traffic signal', 120, 4],
+        ['TRF-PAR', 'Illegal parking', 40, 1],
+        ['TRF-LIC', 'Driving without valid licence', 100, 3],
+        ['TRF-RDW', 'Unroadworthy vehicle', 80, 2],
+        ['TRF-DIS', 'Distracted driving', 90, 2],
+      ] as const) {
+        await tx.offenceCategory.upsert({
+          where: { code },
+          update: {},
+          create: {
+            code,
+            name,
+            description:
+              'Configured academic reference value; not an official penalty.',
+            demoFineAmount: amount,
+            demeritPoints: points,
+            paymentDueDays: 30,
+          },
+        });
+      }
     },
     { timeout: 60000 },
   );

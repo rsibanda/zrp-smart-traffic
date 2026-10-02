@@ -39,7 +39,41 @@ const category = object({
     type: 'string',
     description: 'Decimal fine amount',
   },
+  demeritPoints: count,
+  paymentDueDays: count,
   active: flag,
+});
+const paymentAttempt = object({
+  reference: text,
+  amount: text,
+  currency: text,
+  method: text,
+  status: text,
+  last4: optional(text),
+  createdAt: date,
+  paidAt: optional(date),
+  receiptReference: optional(text),
+  failureReason: optional(text),
+  simulated: flag,
+});
+const motoristTicket = object({
+  reference: text,
+  amount: text,
+  currency: text,
+  status: text,
+  paymentStatus: text,
+  demeritPoints: count,
+  issuedAt: date,
+  dueAt: optional(date),
+  category: text,
+  description: text,
+  registration: text,
+  location: text,
+  officer: text,
+  serviceNumber: optional(text),
+  paidAt: optional(date),
+  receiptReference: optional(text),
+  timeline: array(object({ status: text, at: date })),
 });
 const vehicle = object(
   {
@@ -67,6 +101,9 @@ const ticket = object({
   offenceId: uuid,
   publicReference: text,
   demoFineAmountSnapshot: text,
+  demeritPointsSnapshot: count,
+  motoristId: optional(uuid),
+  dueAt: optional(date),
   status: { type: 'string', enum: ['ISSUED', 'CANCELLED'] },
   issuedAt: date,
 });
@@ -265,6 +302,59 @@ const contracts: Record<string, SchemaObject> = {
   'post /public/tickets/payment-simulation': publicTicket,
 };
 export function addResponseContracts(document: OpenAPIObject) {
+  Object.assign(contracts, {
+    'post /admin/motorist-links': object({
+      registration: text,
+      motorist: text,
+      message: text,
+    }),
+    'get /motorist/dashboard': object({
+      totalPayable: { type: 'number' },
+      pendingFines: count,
+      demeritPoints: count,
+      paidFines: count,
+      registeredVehicles: count,
+      currency: text,
+    }),
+    'get /motorist/infringements': page(motoristTicket),
+    'get /motorist/infringements/{reference}': object({
+      ...motoristTicket.properties,
+      payments: array(paymentAttempt),
+    }),
+    'get /motorist/vehicles': page(
+      object({
+        activeInfringements: count,
+        totalPayable: { type: 'number' },
+        registrationNumber: text,
+        make: text,
+        model: text,
+        colour: text,
+        registrationStatus: text,
+      }),
+    ),
+    'get /motorist/incidents': page(
+      object({
+        type: text,
+        location: text,
+        description: text,
+        status: text,
+        createdAt: date,
+      }),
+    ),
+    'get /motorist/payments': page(
+      object({ ...paymentAttempt.properties, ticketReference: text }),
+    ),
+    'post /motorist/payments': paymentAttempt,
+    'post /motorist/payments/{reference}/outcome': paymentAttempt,
+    'get /motorist/payments/{reference}/receipt': object({
+      ...paymentAttempt.properties,
+      ticketReference: text,
+      motorist: text,
+      registration: text,
+      offence: text,
+      notice: text,
+    }),
+  });
   for (const [path, operations] of Object.entries(document.paths)) {
     for (const method of ['get', 'post', 'patch'] as const) {
       const operation = operations[method];

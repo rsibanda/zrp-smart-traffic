@@ -172,7 +172,6 @@ export function OperationsPanel({
         </p>
       )}
       {message && <p role="status">{message}</p>}
-      {tab === 'Overview' && <AlertsPanel api={api} userId={user.id} />}
       {tab === 'Overview' && overview && (
         <>
           <h2>Command centre overview</h2>
@@ -231,7 +230,9 @@ export function OperationsPanel({
               {overview.officers.map((row) => (
                 <tr key={row.id}>
                   <td>{row.name}</td>
-                  <td>{row.active ? 'Active' : 'Disabled'}</td>
+                  <td>
+                    <StatusBadge value={row.active ? 'ACTIVE' : 'DISABLED'} />
+                  </td>
                   <td>{row._count.offences}</td>
                   <td>{row._count.incidents}</td>
                 </tr>
@@ -240,6 +241,7 @@ export function OperationsPanel({
           </table>
         </>
       )}
+      {tab === 'Overview' && <AlertsPanel api={api} userId={user.id} />}
       {['Incidents', 'Checkpoints'].includes(tab) && (
         <>
           <h2>{tab}</h2>

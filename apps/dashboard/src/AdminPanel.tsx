@@ -16,6 +16,8 @@ type Account = {
   supervisorId: string | null;
 };
 type Category = {
+  demeritPoints?: number;
+  paymentDueDays?: number;
   id: string;
   code: string;
   name: string;
@@ -119,6 +121,8 @@ export function AdminPanel({ api }: { api: Api }) {
           name: data.get('name'),
           description: data.get('description'),
           demoFineAmount: Number(data.get('amount')),
+          demeritPoints: Number(data.get('demeritPoints')),
+          paymentDueDays: Number(data.get('paymentDueDays')),
           active: data.get('active') === 'on',
         },
         category ? 'PATCH' : 'POST',
@@ -136,6 +140,44 @@ export function AdminPanel({ api }: { api: Api }) {
         </p>
       )}
       {message && <p role="status">{message}</p>}
+      <section>
+        <h3>Verified motorist vehicle link</h3>
+        <p>
+          Assign only after verifying the account and vehicle. Existing tickets
+          retain their recorded owner.
+        </p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const data = new FormData(e.currentTarget);
+            void save(() =>
+              api('/admin/motorist-links', {
+                registration: String(data.get('registration'))
+                  .replace(/[\s-]/g, '')
+                  .toUpperCase(),
+                email: data.get('motoristEmail'),
+              }),
+            );
+          }}
+        >
+          <fieldset className="form-grid" disabled={busy}>
+            <Field>
+              Vehicle registration
+              <input name="registration" required placeholder="ABC1234" />
+            </Field>
+            <Field>
+              Motorist account email
+              <input
+                name="motoristEmail"
+                type="email"
+                required
+                placeholder="user@example.com"
+              />
+            </Field>
+            <button>Save verified link</button>
+          </fieldset>
+        </form>
+      </section>
       <section>
         <h3>Accounts and assignments</h3>
         <Field>
@@ -298,11 +340,11 @@ export function AdminPanel({ api }: { api: Api }) {
       </section>
       <section>
         <h3>Offence categories</h3>
-        <ul>
+        <ul className="record-list">
           {categories.map((item) => (
             <li key={item.id}>
               {item.code} · {item.name} · {item.demoFineAmount} ·{' '}
-              {item.active ? 'Active' : 'Inactive'}{' '}
+              <StatusBadge value={item.active ? 'ACTIVE' : 'DISABLED'} />{' '}
               <button onClick={() => setCategory(item)}>Edit category</button>
             </li>
           ))}
@@ -359,6 +401,28 @@ export function AdminPanel({ api }: { api: Api }) {
                 defaultChecked={category?.active ?? true}
               />
               Available to officers
+            </Field>
+            <Field>
+              Demerit points
+              <input
+                name="demeritPoints"
+                type="number"
+                min="0"
+                max="100"
+                required
+                defaultValue={category?.demeritPoints ?? 0}
+              />
+            </Field>
+            <Field>
+              Payment due within (days)
+              <input
+                name="paymentDueDays"
+                type="number"
+                min="1"
+                max="365"
+                required
+                defaultValue={category?.paymentDueDays ?? 30}
+              />
             </Field>
             <button>Save category</button>{' '}
             {category && (

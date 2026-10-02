@@ -592,3 +592,215 @@ section > .field {
   margin: 1rem 0;
   max-width: 620px;
 }
+.record-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 1.4rem;
+  display: grid;
+  gap: 0.65rem;
+}
+.record-list li {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  overflow-wrap: anywhere;
+}
+.record-list li > button {
+  margin: 0.4rem 0.5rem 0.1rem 0;
+}
+.record-list li > p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+/* Shared account ledger and citation surfaces */
+.workspace-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.workspace-tabs button {
+  background: white;
+  color: var(--navy);
+  border: 1px solid var(--border);
+}
+.workspace-tabs button[aria-current='page'] {
+  background: var(--navy);
+  color: white;
+}
+.ledger-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.metric-card {
+  background: white;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 5px #142d4008;
+}
+.metric-card span {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.metric-card strong {
+  display: block;
+  font-size: 1.65rem;
+  margin-top: 0.5rem;
+  color: var(--navy);
+}
+.ledger-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 1rem;
+}
+.infringement-card {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid #9eacb7;
+  border-radius: var(--radius);
+  margin: 0.75rem 0;
+  background: white;
+  min-width: 0;
+}
+.infringement-card[data-status='PENDING'] {
+  border-left-color: #ad7b16;
+}
+.infringement-card[data-status='OVERDUE'] {
+  border-left-color: #b74136;
+}
+.infringement-card[data-status='PAID'] {
+  border-left-color: #28724f;
+}
+.card-title,
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.card-title h3 {
+  margin: 0;
+}
+.card-actions {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  margin-top: 1rem;
+  justify-content: flex-start;
+}
+.fine-amount {
+  font-size: 1.35rem;
+  color: var(--navy);
+  margin-right: auto;
+}
+.reference {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.ledger-heading .eyebrow,
+.citation-terminal .eyebrow {
+  color: var(--teal);
+}
+.vehicle-summary {
+  padding: 1rem;
+  background: #f1f6f7;
+  border-radius: var(--radius);
+  margin: 1rem 0;
+}
+button.secondary {
+  background: white;
+  color: var(--teal);
+  border: 1px solid var(--teal);
+}
+dialog {
+  width: min(600px, calc(100vw - 2rem));
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--navy);
+  box-shadow: 0 12px 45px #0003;
+}
+dialog::backdrop {
+  background: #142d40a8;
+}
+.receipt {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: 1.8;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 0.5rem;
+}
+.detail-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.status-badge[data-status='SUCCESS'],
+.status-badge[data-status='PAID'] {
+  background: #e1f0e7;
+  color: #235c3c;
+}
+.status-badge[data-status='OVERDUE'],
+.status-badge[data-status='FAILED'],
+.status-badge[data-status='TIMED_OUT'] {
+  background: #fbe6e3;
+  color: #8b3026;
+}
+.status-badge[data-status='PROCESSING'],
+.status-badge[data-status='PENDING'] {
+  background: #fff1cc;
+  color: #75510d;
+}
+@media (max-width: 480px) {
+  .workspace-tabs button {
+    flex: 1 1 40%;
+  }
+  .ledger-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .metric-card {
+    padding: 1rem;
+  }
+  .metric-card strong {
+    font-size: 1.25rem;
+  }
+  dialog {
+    padding: 1rem;
+  }
+}
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  dialog[open]:last-of-type,
+  dialog[open]:last-of-type * {
+    visibility: visible;
+  }
+  dialog[open]:last-of-type {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-height: none;
+    border: 0;
+    box-shadow: none;
+  }
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+}
