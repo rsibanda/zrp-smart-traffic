@@ -40,4 +40,11 @@ describe('Request validation', () => {
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+  it('allows empty optional notes while retaining a string contract', async () => {
+    const result = await pipe.transform(
+      { ...draft, notes: '' },
+      { type: 'body', metatype: CreateOffenceDto },
+    );
+    expect(result.notes).toBe('');
+  });
 });

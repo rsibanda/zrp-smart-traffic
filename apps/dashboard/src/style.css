@@ -676,6 +676,90 @@ section > .field {
 .infringement-card[data-status='PAID'] {
   border-left-color: #28724f;
 }
+.infringement-card[data-status='SUCCESS'] {
+  border-left-color: #28724f;
+}
+.ledger-grid .infringement-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  box-shadow: 0 2px 8px #142d4008;
+}
+.ledger-grid .infringement-card p {
+  margin: 0;
+}
+.ledger-grid .infringement-card .card-actions {
+  margin-top: auto;
+}
+.infringement-card .card-title h3 {
+  font-size: 1.2rem;
+  line-height: 1.4;
+}
+.infringement-card .ticket-reference {
+  align-self: flex-start;
+  border-radius: 5px;
+  padding: 0.3rem 0.55rem;
+  background: #edf2f6;
+  color: var(--navy);
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+.record-location .muted {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+.points {
+  color: #75510d;
+  font-size: 0.9rem;
+}
+.payment-reference {
+  overflow-wrap: anywhere;
+}
+.payment-card .card-title h3 {
+  font-size: 1.35rem;
+}
+.citation-steps {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.5rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+.citation-steps [aria-current='step'] {
+  color: var(--teal);
+  font-weight: 700;
+}
+.citation-fields {
+  align-items: end;
+}
+.citation-fields > button {
+  align-self: end;
+  margin: 0;
+  min-height: 44px;
+}
+.citation-calculation {
+  background: #edf4f5;
+  padding: 1.25rem;
+  border: 1px solid #c9dcdf;
+  border-radius: var(--radius);
+  margin: 1rem 0;
+  line-height: 2;
+}
+.citation-calculation .fine-amount {
+  margin-right: 0.5rem;
+}
+.metric-card:first-child {
+  border-top: 3px solid var(--teal);
+}
+.metric-card strong,
+.fine-amount {
+  font-variant-numeric: tabular-nums;
+}
 .card-title,
 .card-actions {
   display: flex;

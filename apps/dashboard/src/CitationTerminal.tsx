@@ -1,3 +1,4 @@
+import { formatCurrency, ticketLabel } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import { Field } from './Field';
 import { EvidencePanel } from './EvidencePanel';
@@ -15,6 +16,7 @@ type Vehicle = {
   make: string;
   model: string;
   motoristId: string | null;
+  motorist?: { name: string } | null;
   driver: { fullName: string; licenceStatus: string } | null;
 };
 export function CitationTerminal({
@@ -32,6 +34,7 @@ export function CitationTerminal({
     [ticket, setTicket] = useState<{
       id: string;
       publicReference: string;
+      displayReference?: string;
       demoFineAmountSnapshot: string;
     } | null>(null);
   const [code, setCode] = useState(''),
@@ -47,7 +50,7 @@ export function CitationTerminal({
       .then((data) => {
         if (active) {
           setCategories(data);
-          setCategory(data[0]?.id ?? '');
+          setCategory('');
         }
       })
       .catch((e) => {
@@ -73,6 +76,15 @@ export function CitationTerminal({
     <section className="citation-terminal">
       <span className="eyebrow">OFFICER CITATION TERMINAL</span>
       <h2>Issue Traffic Infringement</h2>
+      <ol className="citation-steps" aria-label="Citation steps">
+        <li aria-current={!vehicle ? 'step' : undefined}>1. Find vehicle</li>
+        <li aria-current={vehicle && !draft ? 'step' : undefined}>
+          2. Record infringement
+        </li>
+        <li aria-current={draft && !ticket ? 'step' : undefined}>
+          3. Review &amp; issue
+        </li>
+      </ol>
       {error && (
         <p className="error" role="alert">
           {error}
@@ -90,7 +102,7 @@ export function CitationTerminal({
           });
         }}
       >
-        <div className="form-grid">
+        <div className="form-grid citation-fields">
           <Field>
             Vehicle registration
             <input
@@ -121,7 +133,7 @@ export function CitationTerminal({
             </p>
             <p>
               {vehicle.motoristId
-                ? 'Motorist account linked'
+                ? `Linked motorist: ${vehicle.motorist?.name ?? 'Account verified'}`
                 : 'Account not linked. Provide a ticket verification code after issue.'}
             </p>
           </div>
@@ -149,7 +161,7 @@ export function CitationTerminal({
               }}
             >
               <fieldset disabled={busy || !!draft || uncertain}>
-                <div className="form-grid">
+                <div className="form-grid citation-fields">
                   <Field>
                     Offence category
                     <select
@@ -157,6 +169,9 @@ export function CitationTerminal({
                       onChange={(e) => setCategory(e.target.value)}
                       required
                     >
+                      <option value="" disabled>
+                        Select an offence category
+                      </option>
                       {categories.map((c) => (
                         <option value={c.id} key={c.id}>
                           {c.name}
@@ -175,25 +190,27 @@ export function CitationTerminal({
                     />
                   </Field>
                   <Field>
-                    Officer notes
+                    Officer notes (optional)
                     <textarea
                       name="notes"
-                      required
-                      minLength={3}
                       maxLength={2000}
                       placeholder="Record the observed facts"
                     />
                   </Field>
                 </div>
               </fieldset>
-              <p>
-                Fine: <strong>{selected?.demoFineAmount} units</strong> ·
-                Demerit points: <strong>{selected?.demeritPoints ?? 0}</strong>{' '}
-                · Due within {selected?.paymentDueDays ?? 30} days
-              </p>
+              <div className="citation-calculation">
+                Fine:{' '}
+                <strong className="fine-amount">
+                  {formatCurrency(selected?.demoFineAmount)}
+                </strong>{' '}
+                · Demerit points:{' '}
+                <strong>{selected?.demeritPoints ?? 0}</strong> · Due within{' '}
+                {selected?.paymentDueDays ?? 30} days
+              </div>
               <p className="muted">
-                Configured academic reference values. Observation time is
-                recorded when the draft is saved.
+                The selected category determines the fine and points.
+                Observation time is recorded when the draft is saved.
               </p>
               {!draft ? (
                 <button disabled={busy}>
@@ -224,8 +241,8 @@ export function CitationTerminal({
       {ticket && (
         <div role="status">
           <h3>Infringement issued</h3>
-          <p className="reference">{ticket.publicReference}</p>
-          <p>Amount: {ticket.demoFineAmountSnapshot} units</p>
+          <p className="reference">{ticketLabel(ticket)}</p>
+          <p>Amount: {formatCurrency(ticket.demoFineAmountSnapshot)}</p>
           <button
             disabled={busy}
             onClick={() =>
@@ -265,12 +282,12 @@ export function CitationTerminal({
           {vehicle?.registrationNumber} · {selected?.name}
         </p>
         <p>
-          {selected?.demoFineAmount} units · {selected?.demeritPoints ?? 0}{' '}
-          points
+          {formatCurrency(selected?.demoFineAmount)} ·{' '}
+          {selected?.demeritPoints ?? 0} points
         </p>
         <p>
           {vehicle?.motoristId
-            ? 'Motorist account linked'
+            ? `Linked motorist: ${vehicle.motorist?.name ?? 'Account verified'}`
             : 'Ticket verification required to link an account.'}
         </p>
         {error && <p role="alert">{error}</p>}

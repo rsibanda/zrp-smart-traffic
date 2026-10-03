@@ -1,3 +1,4 @@
+import { CURRENCY } from './currency';
 import {
   BadRequestException,
   Body,
@@ -46,6 +47,8 @@ async function publicTicket(tx: Prisma.TransactionClient, ticketId: string) {
   return {
     warning,
     reference: ticket.publicReference,
+    displayReference: ticket.displayReference,
+    currency: CURRENCY,
     demoAmount: ticket.demoFineAmountSnapshot,
     status: ticket.status,
     issuedAt: ticket.issuedAt,
@@ -99,8 +102,13 @@ export class PublicController {
         account.user.role !== 'USER'
       )
         throw new UnauthorizedException('Sign in required');
-      const ticket = await tx.ticket.findUnique({
-        where: { publicReference: dto.reference },
+      const ticket = await tx.ticket.findFirst({
+        where: {
+          OR: [
+            { publicReference: dto.reference },
+            { displayReference: dto.reference },
+          ],
+        },
         include: { publicAccess: true },
       });
       if (
@@ -360,7 +368,12 @@ export class PublicManagementController {
           entityId: id,
         },
       });
-      return { warning, reference: ticket.publicReference, verificationCode };
+      return {
+        warning,
+        reference: ticket.publicReference,
+        displayReference: ticket.displayReference,
+        verificationCode,
+      };
     });
   }
   @Get('alerts')

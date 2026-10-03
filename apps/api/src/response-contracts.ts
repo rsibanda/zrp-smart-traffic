@@ -57,6 +57,8 @@ const paymentAttempt = object({
   simulated: flag,
 });
 const motoristTicket = object({
+  displayReference: text,
+  receiptPaymentReference: optional(text),
   reference: text,
   amount: text,
   currency: text,
@@ -85,6 +87,7 @@ const vehicle = object(
     registrationStatus: text,
     driverId: optional(uuid),
     driver: optional(object({ fullName: text, licenceStatus: text })),
+    motorist: optional(object({ name: text })),
   },
   [
     'id',
@@ -97,6 +100,7 @@ const vehicle = object(
   ],
 );
 const ticket = object({
+  displayReference: text,
   id: uuid,
   offenceId: uuid,
   publicReference: text,
@@ -183,6 +187,8 @@ const alert = object({
   createdAt: date,
 });
 const publicTicket = object({
+  displayReference: text,
+  currency: text,
   warning: text,
   reference: text,
   demoAmount: text,
@@ -282,6 +288,7 @@ const contracts: Record<string, SchemaObject> = {
   'post /tickets/{id}/access-code': object({
     warning: text,
     reference: text,
+    displayReference: text,
     verificationCode: text,
   }),
   'get /health': object({ status: { type: 'string', enum: ['ok'] } }),
@@ -342,12 +349,17 @@ export function addResponseContracts(document: OpenAPIObject) {
       }),
     ),
     'get /motorist/payments': page(
-      object({ ...paymentAttempt.properties, ticketReference: text }),
+      object({
+        ...paymentAttempt.properties,
+        ticketDisplayReference: text,
+        ticketReference: text,
+      }),
     ),
     'post /motorist/payments': paymentAttempt,
     'post /motorist/payments/{reference}/outcome': paymentAttempt,
     'get /motorist/payments/{reference}/receipt': object({
       ...paymentAttempt.properties,
+      ticketDisplayReference: text,
       ticketReference: text,
       motorist: text,
       registration: text,

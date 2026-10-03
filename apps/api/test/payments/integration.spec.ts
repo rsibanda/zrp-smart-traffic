@@ -114,6 +114,8 @@ describe('Account ownership and simulated payment transactions', () => {
     ]);
     expect(a.status).toBe(201);
     expect(b.body.id).toBe(a.body.id);
+    expect(a.body.displayReference).toMatch(/^INF-\d{4}-\d{6,}$/);
+    expect(b.body.displayReference).toBe(a.body.displayReference);
     return a.body;
   }
   it('requires admin verified linkage and isolates linked vehicles and issued tickets', async () => {
@@ -130,6 +132,8 @@ describe('Account ownership and simulated payment transactions', () => {
     ).expect(200);
     expect(own.body.demeritPoints).toBe(3);
     expect(own.body.amount).toBe('80');
+    expect(own.body.currency).toBe('USD');
+    expect(own.body.displayReference).toBe(ticket.displayReference);
     expect(own.body.id).toBeUndefined();
     await call(
       'get',
@@ -147,6 +151,18 @@ describe('Account ownership and simulated payment transactions', () => {
     const summary = await call('get', '/motorist/dashboard').expect(200);
     expect(summary.body.totalPayable).toBe(80);
     expect(summary.body.demeritPoints).toBe(3);
+    expect(summary.body.registeredVehicles).toBe(1);
+    const linked = await call('get', '/motorist/vehicles').expect(200);
+    expect(linked.body.total).toBe(summary.body.registeredVehicles);
+    expect(linked.body.items[0].registrationNumber).toBe(plate);
+    const byReference = await call(
+      'get',
+      `/offences?q=${ticket.displayReference}`,
+      'SUPERVISOR',
+    ).expect(200);
+    expect(byReference.body.items[0].ticket.displayReference).toBe(
+      ticket.displayReference,
+    );
   });
   it.each([
     ['ECOCASH', 'APPROVE', 'SUCCESS'],
@@ -211,6 +227,22 @@ describe('Account ownership and simulated payment transactions', () => {
         `/motorist/payments/${a.body.reference}/receipt`,
       ).expect(status === 'SUCCESS' ? 200 : 404);
       if (status === 'SUCCESS') {
+        expect(receipt.body.ticketDisplayReference).toBe(
+          ticket.displayReference,
+        );
+        expect(receipt.body.method).toBe(method);
+        expect(receipt.body.currency).toBe('USD');
+        expect(own.body.receiptPaymentReference).toBe(a.body.reference);
+        const history = await call('get', '/motorist/payments');
+        expect(
+          history.body.items.find(
+            (p: { reference: string }) => p.reference === a.body.reference,
+          ),
+        ).toMatchObject({
+          method,
+          ticketDisplayReference: ticket.displayReference,
+          status: 'SUCCESS',
+        });
         expect(receipt.body.notice).toContain('no funds');
         expect(receipt.body.id).toBeUndefined();
         await call('post', '/motorist/payments')
@@ -308,6 +340,16 @@ describe('Account ownership and simulated payment transactions', () => {
       reference: ticket.publicReference,
       verificationCode: code.body.verificationCode,
     };
+    await call('post', '/public/tickets/verify')
+      .send({
+        ...dto,
+        reference: ticket.displayReference,
+        verificationCode: '0000000000000000',
+      })
+      .expect(401);
+    await call('post', '/public/tickets/verify')
+      .send({ ...dto, reference: ticket.displayReference })
+      .expect(200);
     await call('post', '/public/tickets/verify').send(dto).expect(200);
     await call('post', '/public/tickets/verify', 'OTHER').send(dto).expect(401);
     expect(

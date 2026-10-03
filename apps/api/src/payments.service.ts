@@ -1,3 +1,4 @@
+import { CURRENCY } from './currency';
 import {
   ConflictException,
   Injectable,
@@ -11,6 +12,11 @@ import { serial } from './transactions';
 export const reference = (prefix: string) =>
   `${prefix}-${randomBytes(12).toString('hex')}`;
 export const ticketInclude = {
+  payments: {
+    where: { status: 'SUCCESS' as const },
+    select: { paymentReference: true, motoristId: true },
+    take: 1,
+  },
   publicAccess: { select: { paidAt: true, receiptReference: true } },
   offence: {
     include: {
@@ -38,8 +44,12 @@ export function effectivePaymentStatus(
 export function ledgerTicket(ticket: LedgerTicket) {
   return {
     reference: ticket.publicReference,
+    displayReference: ticket.displayReference,
+    receiptPaymentReference:
+      ticket.payments.find((p) => p.motoristId === ticket.motoristId)
+        ?.paymentReference ?? null,
     amount: ticket.demoFineAmountSnapshot.toString(),
-    currency: 'UNITS',
+    currency: CURRENCY,
     status: ticket.offence.status,
     paymentStatus: effectivePaymentStatus(ticket),
     demeritPoints:
@@ -173,6 +183,7 @@ export class PaymentsService {
           last4: dto.method === 'CARD' ? dto.last4 : null,
           paymentReference: reference('PAY'),
           amount: ticket.demoFineAmountSnapshot,
+          currency: CURRENCY,
         },
       });
       await tx.auditEvent.create({

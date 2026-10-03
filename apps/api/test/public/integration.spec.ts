@@ -249,6 +249,8 @@ describe('Public ticket isolation and private evidence', () => {
       [
         'warning',
         'reference',
+        'displayReference',
+        'currency',
         'demoAmount',
         'status',
         'issuedAt',

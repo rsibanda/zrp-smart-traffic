@@ -1,10 +1,17 @@
 import { Field } from './Field';
 import { apiUrl, responseError, serviceUnavailable } from './api';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { readable, StatusBadge } from './presentation';
+import {
+  readable,
+  StatusBadge,
+  formatCurrency,
+  ticketLabel,
+} from './presentation';
 type Ticket = {
   warning: string;
   reference: string;
+  displayReference?: string;
+  currency?: string;
   category: string;
   demoAmount: string;
   status: string;
@@ -177,11 +184,11 @@ export function PublicPortal({
       ) : (
         <article className="ticket">
           <h3>Verified Traffic Ticket</h3>
-          <p>Reference: {ticket.reference}</p>
+          <p>Reference: {ticketLabel(ticket)}</p>
           <p>
             {ticket.category} · <StatusBadge value={ticket.status} />
           </p>
-          <p>Amount: {ticket.demoAmount}</p>
+          <p>Amount: {formatCurrency(ticket.demoAmount, ticket.currency)}</p>
           <p>
             Payment status:{' '}
             <StatusBadge value={ticket.paymentStatus} kind="payment" />

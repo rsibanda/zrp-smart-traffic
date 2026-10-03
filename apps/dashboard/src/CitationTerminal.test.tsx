@@ -47,6 +47,7 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
       return {
         id: 'ticket',
         publicReference: 'ticket-reference',
+        displayReference: 'INF-2026-000125',
         demoFineAmountSnapshot: '80',
       };
     throw new Error(`Unexpected endpoint ${path}`);
@@ -61,7 +62,10 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
   fireEvent.change(screen.getByLabelText('Location'), {
     target: { value: 'Central intersection' },
   });
-  fireEvent.change(screen.getByLabelText('Officer notes'), {
+  fireEvent.change(screen.getByLabelText('Offence category'), {
+    target: { value: 'category' },
+  });
+  fireEvent.change(screen.getByLabelText('Officer notes (optional)'), {
     target: { value: 'Observed speeding' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Review Infringement' }));
@@ -75,6 +79,8 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
     within(confirm).getByRole('button', { name: 'Issue Infringement' }),
   );
   await screen.findByRole('heading', { name: 'Infringement issued' });
+  expect(screen.getByText('INF-2026-000125')).toBeTruthy();
+  expect(screen.queryByText('ticket-reference')).toBeNull();
   expect(
     api.mock.calls.filter(([path]) => path.endsWith('/submit')),
   ).toHaveLength(1);

@@ -191,7 +191,20 @@ export class OffencesService {
                 },
                 {
                   ticket: {
-                    publicReference: { contains: query.q, mode: 'insensitive' },
+                    OR: [
+                      {
+                        publicReference: {
+                          contains: query.q,
+                          mode: 'insensitive',
+                        },
+                      },
+                      {
+                        displayReference: {
+                          contains: query.q,
+                          mode: 'insensitive',
+                        },
+                      },
+                    ],
                   },
                 },
               ],

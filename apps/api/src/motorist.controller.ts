@@ -1,3 +1,4 @@
+import { CURRENCY } from './currency';
 import {
   Body,
   Controller,
@@ -91,7 +92,7 @@ export class MotoristController {
       demeritPoints: rows.reduce((sum, t) => sum + t.demeritPoints, 0),
       paidFines: rows.filter((t) => t.paymentStatus === 'PAID').length,
       registeredVehicles: vehicles,
-      currency: 'UNITS',
+      currency: CURRENCY,
     };
   }
   @Get('infringements')
@@ -209,7 +210,9 @@ export class MotoristController {
     const [items, total] = await this.db.$transaction([
       this.db.payment.findMany({
         where,
-        include: { ticket: { select: { publicReference: true } } },
+        include: {
+          ticket: { select: { publicReference: true, displayReference: true } },
+        },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (q.page - 1) * q.pageSize,
         take: q.pageSize,
@@ -220,6 +223,7 @@ export class MotoristController {
       items: items.map((p) => ({
         ...paymentView(p),
         ticketReference: p.ticket.publicReference,
+        ticketDisplayReference: p.ticket.displayReference,
       })),
       total,
       page: q.page,
@@ -260,6 +264,7 @@ export class MotoristController {
       ...paymentView(payment),
       motorist: req.actor.name,
       ticketReference: payment.ticket.publicReference,
+      ticketDisplayReference: payment.ticket.displayReference,
       registration: payment.ticket.offence.vehicle.registrationNumber,
       offence: payment.ticket.offence.category.name,
       notice:

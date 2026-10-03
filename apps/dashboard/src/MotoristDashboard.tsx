@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { PublicPortal } from './PublicPortal';
 import { Field } from './Field';
-import { readable, StatusBadge } from './presentation';
+import {
+  readable,
+  StatusBadge,
+  formatCurrency,
+  paymentMethodLabel,
+  ticketLabel,
+} from './presentation';
 
 export type { Api as AccountApi } from './AdminPanel';
 import type { Api as AccountApi } from './AdminPanel';
 type Ticket = {
+  displayReference?: string;
+  currency?: string;
+  receiptPaymentReference?: string | null;
   reference: string;
   amount: string;
   category: string;
@@ -23,6 +32,8 @@ type Ticket = {
   payments?: Payment[];
 };
 type Payment = {
+  currency?: string;
+  ticketDisplayReference?: string;
   reference: string;
   ticketReference?: string;
   amount: string;
@@ -42,6 +53,7 @@ type Receipt = Payment & {
   notice: string;
 };
 type Summary = {
+  currency?: string;
   totalPayable: number;
   pendingFines: number;
   demeritPoints: number;
@@ -57,7 +69,7 @@ type Vehicle = {
   colour: string;
   registrationStatus: string;
 };
-const money = (value: string | number) => `${Number(value).toFixed(2)} units`;
+const money = formatCurrency;
 const date = (value: string | null) =>
   value ? new Date(value).toLocaleString() : 'Not specified';
 export function receiptText(r: Receipt) {
@@ -66,13 +78,13 @@ export function receiptText(r: Receipt) {
     'PAYMENT RECEIPT',
     `Receipt: ${r.receiptReference}`,
     `Transaction: ${r.reference}`,
-    `Ticket: ${r.ticketReference}`,
+    `Ticket: ${r.ticketDisplayReference ?? 'Traffic ticket'}`,
     `Motorist: ${r.motorist}`,
     `Vehicle: ${r.registration}`,
     `Offence: ${r.offence}`,
-    `Amount: ${money(r.amount)}`,
-    `Method: ${readable(r.method)} ${r.last4 ? `•••• ${r.last4}` : ''}`,
-    `Status: ${r.status}`,
+    `Amount: ${money(r.amount, r.currency)}`,
+    `Method: ${paymentMethodLabel(r.method)} ${r.last4 ? `•••• ${r.last4}` : ''}`,
+    `Status: ${r.status === 'SUCCESS' ? 'Paid' : readable(r.status)}`,
     `Date: ${date(r.paidAt)}`,
     r.notice,
   ].join('\n');
@@ -271,7 +283,10 @@ export function MotoristDashboard({
           ) : (
             <div className="ledger-metrics">
               {[
-                ['Total Payable', money(summary.totalPayable)],
+                [
+                  'Total Payable',
+                  money(summary.totalPayable, summary.currency),
+                ],
                 ['Pending Fines', summary.pendingFines],
                 ['Demerit Points', `${summary.demeritPoints} pts`],
                 ['Paid Fines', summary.paidFines],
@@ -305,20 +320,28 @@ export function MotoristDashboard({
                     key={t.reference}
                   >
                     <div className="card-title">
-                      <h3>{t.category}</h3>
+                      <h3>{t.category || 'Traffic offence'}</h3>
                       <StatusBadge value={t.paymentStatus} />
                     </div>
                     <p>
                       <strong>{t.registration}</strong> · {date(t.issuedAt)}
                     </p>
-                    <p className="reference">{t.reference}</p>
-                    <p>{t.location}</p>
+                    <p className="reference ticket-reference">
+                      {ticketLabel(t)}
+                    </p>
+                    <p className="record-location">
+                      <span className="muted">Location</span> {t.location}
+                    </p>
                     <p>
-                      {t.demeritPoints} demerit points ·{' '}
-                      <StatusBadge value={t.status} />
+                      <strong className="points">
+                        {t.demeritPoints} demerit points
+                      </strong>{' '}
+                      · <StatusBadge value={t.status} />
                     </p>
                     <div className="card-actions">
-                      <strong className="fine-amount">{money(t.amount)}</strong>
+                      <strong className="fine-amount">
+                        {money(t.amount, t.currency)}
+                      </strong>
                       <button
                         className="secondary"
                         disabled={busy}
@@ -334,6 +357,17 @@ export function MotoristDashboard({
                       >
                         View details
                       </button>
+                      {t.paymentStatus === 'PAID' &&
+                        t.receiptPaymentReference && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void openReceipt(t.receiptPaymentReference!)
+                            }
+                          >
+                            View Receipt
+                          </button>
+                        )}
                       {['PENDING', 'OVERDUE'].includes(t.paymentStatus) && (
                         <button disabled={busy} onClick={() => begin(t)}>
                           Pay Now
@@ -395,17 +429,26 @@ export function MotoristDashboard({
                 <p className="empty-state">No payment history available.</p>
               )}
               {payments.map((p) => (
-                <article className="infringement-card" key={p.reference}>
+                <article
+                  className="infringement-card payment-card"
+                  data-status={p.status}
+                  key={p.reference}
+                >
                   <div className="card-title">
                     <h3>
-                      {money(p.amount)} · {readable(p.method)}
+                      {money(p.amount, p.currency)} ·{' '}
+                      {paymentMethodLabel(p.method)}
                     </h3>
                     <StatusBadge value={p.status} />
                   </div>
-                  <p className="reference">{p.reference}</p>
+                  <p className="muted payment-reference">
+                    Transaction: {p.reference}
+                  </p>
                   <p>
                     Ticket:{' '}
-                    <span className="reference">{p.ticketReference}</span>
+                    <span className="reference">
+                      {p.ticketDisplayReference ?? 'Traffic ticket'}
+                    </span>
                   </p>
                   <p>{date(p.createdAt)}</p>
                   {p.failureReason && <p>{p.failureReason}</p>}
@@ -452,7 +495,7 @@ export function MotoristDashboard({
           {selected && (
             <section aria-label="Infringement details">
               <h2>{selected.category}</h2>
-              <p className="reference">{selected.reference}</p>
+              <p className="reference">{ticketLabel(selected)}</p>
               <p>{selected.description}</p>
               <dl className="detail-grid">
                 <dt>Vehicle</dt>
@@ -466,7 +509,7 @@ export function MotoristDashboard({
                 <dt>Due date</dt>
                 <dd>{date(selected.dueAt)}</dd>
                 <dt>Amount</dt>
-                <dd>{money(selected.amount)}</dd>
+                <dd>{money(selected.amount, selected.currency)}</dd>
                 <dt>Points</dt>
                 <dd>{selected.demeritPoints}</dd>
               </dl>
@@ -482,7 +525,8 @@ export function MotoristDashboard({
               )}
               {selected.payments?.map((p) => (
                 <p key={p.reference}>
-                  {readable(p.method)} · <StatusBadge value={p.status} />{' '}
+                  {paymentMethodLabel(p.method)} ·{' '}
+                  <StatusBadge value={p.status} />{' '}
                   {p.status === 'SUCCESS' && (
                     <button
                       disabled={busy}
@@ -534,8 +578,10 @@ export function MotoristDashboard({
             <p>
               {paying.category} · {paying.registration}
             </p>
-            <p className="reference">{paying.reference}</p>
-            <strong className="fine-amount">{money(paying.amount)}</strong>
+            <p className="reference">{ticketLabel(paying)}</p>
+            <strong className="fine-amount">
+              {money(paying.amount, paying.currency)}
+            </strong>
             <fieldset disabled={busy || uncertain}>
               <Field>
                 Payment method
@@ -620,7 +666,8 @@ export function MotoristDashboard({
           <>
             <p className="reference">{payment.reference}</p>
             <p>
-              {money(payment.amount)} · {readable(payment.method)}{' '}
+              {money(payment.amount, payment.currency)} ·{' '}
+              {paymentMethodLabel(payment.method)}{' '}
               {payment.last4 && `•••• ${payment.last4}`}
             </p>
             <StatusBadge value={payment.status} />

@@ -6,7 +6,14 @@ import { OperationsPanel } from './OperationsPanel';
 import { MotoristDashboard } from './MotoristDashboard';
 import { CitationTerminal } from './CitationTerminal';
 import { EvidencePanel } from './EvidencePanel';
-import { roleLabel, statusLabel, StatusBadge } from './presentation';
+import {
+  roleLabel,
+  statusLabel,
+  StatusBadge,
+  formatCurrency,
+  paymentMethodLabel,
+  ticketLabel,
+} from './presentation';
 
 type User = {
   id: string;
@@ -25,6 +32,7 @@ type Offence = {
   ticket: null | {
     id: string;
     publicReference: string;
+    displayReference?: string;
     demoFineAmountSnapshot: string;
     status: string;
     payments?: { method: string; status: string; paidAt: string | null }[];
@@ -502,7 +510,7 @@ export function App() {
                 {selected.ticket && (
                   <div className="ticket">
                     <h3>Traffic ticket</h3>
-                    <p>Reference: {selected.ticket.publicReference}</p>
+                    <p>Reference: {ticketLabel(selected.ticket)}</p>
                     {selected.paymentStatus && (
                       <p>
                         Payment: <StatusBadge value={selected.paymentStatus} />
@@ -511,7 +519,8 @@ export function App() {
                     {selected.ticket.payments?.[0] && (
                       <p>
                         Method:{' '}
-                        {statusLabel(selected.ticket.payments[0].method)} ·{' '}
+                        {paymentMethodLabel(selected.ticket.payments[0].method)}{' '}
+                        ·{' '}
                         {selected.ticket.payments[0].paidAt
                           ? new Date(
                               selected.ticket.payments[0].paidAt,
@@ -520,7 +529,8 @@ export function App() {
                       </p>
                     )}
                     <p>
-                      Amount: {selected.ticket.demoFineAmountSnapshot} ·{' '}
+                      Amount:{' '}
+                      {formatCurrency(selected.ticket.demoFineAmountSnapshot)} ·{' '}
                       <StatusBadge value={selected.ticket.status} />
                     </p>
                   </div>

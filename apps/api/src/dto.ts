@@ -79,7 +79,14 @@ export class CreateOffenceDto {
   @ApiProperty() @IsUUID() vehicleId!: string;
   @ApiProperty() @IsUUID() categoryId!: string;
   @ApiProperty() @IsString() @Length(3, 200) @Matches(/\S/) location!: string;
-  @ApiProperty() @IsString() @Length(3, 2000) @Matches(/\S/) notes!: string;
+  @ApiProperty({
+    description:
+      'Optional observation notes; send an empty string when omitted.',
+  })
+  @IsString()
+  @Length(0, 2000)
+  @Matches(/^$|\S/)
+  notes!: string;
   @ApiProperty({ example: '2026-09-21T12:00:00Z' })
   @IsISO8601({ strict: true })
   @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/)

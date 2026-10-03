@@ -128,6 +128,7 @@ model Ticket {
   id String @id @default(uuid()) @db.Uuid
   offenceId String @unique @db.Uuid
   offence Offence @relation(fields: [offenceId], references: [id])
+  displayReference String @unique @default(dbgenerated("next_ticket_reference()"))
   publicReference String @unique
   demoFineAmountSnapshot Decimal @db.Decimal(10, 2)
   status TicketStatus @default(ISSUED)
@@ -162,7 +163,7 @@ model Payment {
   motoristId String @db.Uuid
   motorist User @relation(fields: [motoristId], references: [id])
   amount Decimal @db.Decimal(10, 2)
-  currency String @default("UNITS")
+  currency String @default("USD")
   method PaymentMethod
   status PaymentStatus @default(PROCESSING)
   last4 String?

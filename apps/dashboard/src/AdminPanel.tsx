@@ -1,3 +1,4 @@
+import { formatCurrency } from './presentation';
 import { Field } from './Field';
 import { roleLabel, auditLabel, StatusBadge } from './presentation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
@@ -343,8 +344,8 @@ export function AdminPanel({ api }: { api: Api }) {
         <ul className="record-list">
           {categories.map((item) => (
             <li key={item.id}>
-              {item.code} · {item.name} · {item.demoFineAmount} ·{' '}
-              <StatusBadge value={item.active ? 'ACTIVE' : 'DISABLED'} />{' '}
+              {item.code} · {item.name} · {formatCurrency(item.demoFineAmount)}{' '}
+              · <StatusBadge value={item.active ? 'ACTIVE' : 'DISABLED'} />{' '}
               <button onClick={() => setCategory(item)}>Edit category</button>
             </li>
           ))}

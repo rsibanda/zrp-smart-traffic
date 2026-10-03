@@ -14,6 +14,7 @@ it('uses linked records, retains a payment request key after connection loss, an
     attempts = 0;
   const ticket = {
     reference: 'reference-test-123456',
+    displayReference: 'INF-2026-000125',
     amount: '80',
     category: 'Speeding',
     registration: 'ABC1234',
@@ -109,6 +110,7 @@ it('exports a receipt with an explicit simulation disclosure', () => {
   const text = receiptText({
     reference: 'PAY-test',
     ticketReference: 'ticket-reference',
+    ticketDisplayReference: 'INF-2026-000125',
     amount: '80',
     method: 'CARD',
     status: 'SUCCESS',
@@ -123,7 +125,76 @@ it('exports a receipt with an explicit simulation disclosure', () => {
     notice:
       'Simulated payment receipt — no funds transferred. Academic Prototype.',
   });
-  expect(text).toContain('80.00 units');
+  expect(text).toContain('US$80.00');
+  expect(text).toContain('Bank Card');
+  expect(text).toContain('INF-2026-000125');
+  expect(text).not.toContain('ticket-reference');
   expect(text).toContain('no funds transferred');
   expect(text).not.toContain('undefined');
+});
+
+it('opens a paid ticket receipt directly and hides the opaque lookup key', async () => {
+  const api = vi.fn(async (path: string) => {
+    if (path === '/motorist/dashboard')
+      return {
+        totalPayable: 0,
+        pendingFines: 0,
+        demeritPoints: 3,
+        paidFines: 1,
+        registeredVehicles: 1,
+        currency: 'USD',
+      };
+    if (path.startsWith('/motorist/infringements?'))
+      return {
+        total: 1,
+        items: [
+          {
+            reference: 'opaque-secret-reference',
+            displayReference: 'INF-2026-000125',
+            category: 'Speeding',
+            registration: 'ABC1234',
+            location: 'Harare Central',
+            amount: '25',
+            currency: 'USD',
+            demeritPoints: 3,
+            paymentStatus: 'PAID',
+            status: 'CONFIRMED',
+            issuedAt: '2026-10-02T09:00:00Z',
+            receiptPaymentReference: 'PAY-test',
+          },
+        ],
+      };
+    if (path === '/motorist/payments/PAY-test/receipt')
+      return {
+        reference: 'PAY-test',
+        ticketDisplayReference: 'INF-2026-000125',
+        amount: '25',
+        currency: 'USD',
+        method: 'ECOCASH',
+        status: 'SUCCESS',
+        receiptReference: 'RCT-test',
+        motorist: 'Sample Motorist',
+        registration: 'ABC1234',
+        offence: 'Speeding',
+        paidAt: '2026-10-02T09:00:00Z',
+        notice: 'Simulated payment receipt — no funds transferred.',
+      };
+    throw new Error(path);
+  });
+  render(
+    <MotoristDashboard
+      api={api}
+      accountToken="test"
+      user={{ name: 'Sample Motorist' }}
+      onSessionExpired={() => {}}
+    />,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'View Receipt' }));
+  const receipt = await screen.findByRole('dialog', {
+    name: 'Payment receipt',
+  });
+  expect(receipt.textContent).toContain('EcoCash');
+  expect(receipt.textContent).toContain('US$25.00');
+  expect(screen.queryByText('opaque-secret-reference')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Pay Now' })).toBeNull();
 });
