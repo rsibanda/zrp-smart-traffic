@@ -4,6 +4,16 @@ Status: free Render backend and Netlify frontend deployed. Hosted API workflows 
 Destination team: https://app.netlify.com/teams/rsibanda
 Repository: https://github.com/rsibanda/zrp-smart-traffic
 
+## Latest refinement deployment — 3 October 2026
+
+Application commit `aa0a4df` is live on both existing free hosts from `deployment/free-hosting`. Render deployment `dep-db0bs1gu01pc739mq1a0` is live and healthy; Netlify deployment `6ac0be7ecbb08b118e3ed59b` is ready. Includes USD formatting, readable ticket references, payment-method labels, stronger status cards and the expanded citation form.
+
+All eight migrations are applied. The reference/currency migration passed on isolated branch `br-still-pine-b1t8hxfy` before production. Both hosted tickets and their original UUID/opaque lookup references were preserved; readable INF references were added. No accounts were reset or reseeded. The test branch has automatic expiry.
+
+Validation: typecheck, lint, 48 API tests, 12 web tests, 31 local PostgreSQL integration tests and production API/web builds passed. Hosted HTTP/API checks passed for all four roles, permissions, invalid credentials, logout, CORS, USD denomination, readable motorist references, vehicle count/list agreement and demerit/payment totals. Both public `/` and `/admin` serve the refined bundle with the correct API origin. Browser-driven visual checks remain unverified following the earlier headless Chrome policy block.
+
+Hosted consistency finding: ABC1234 currently has no motorist-account link, so its absence from Registered Vehicles is correct. Ticket verification/ownership does not establish vehicle ownership. An administrator must verify and assign that relationship through the existing motorist-link form; deployment did not infer ownership or fake a count. Nonzero demerit aggregation and all three simulated payment methods passed the integration tests. Existing hosted zero-point records were preserved.
+
 ## Latest deployment and login check — 2 October 2026
 
 Published application commit `4b480e2` from `deployment/free-hosting` to both hosts. Render deployment `dep-davvlpnavr4c73djbuu0` is live; Netlify deployment `6abffb5ece01f1fe2c46ee86` is ready. The newer citation terminal and motorist account/payment screens are now included. Hosting remains free.

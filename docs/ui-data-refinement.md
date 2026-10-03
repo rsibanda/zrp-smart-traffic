@@ -36,3 +36,9 @@ Web: presentation helpers, MotoristDashboard, CitationTerminal, App, PublicPorta
 Android: presentation helpers, motorist ledger, role workspace, officer screen and tests. README, API documentation and decisions describe the compatibility and data assumptions.
 
 Final Android package rebuilt after the scrolling/overflow fixes, installed successfully on Pixel_8, and launched. The final automated total is 100 passing tests (48 API, 12 web, 31 integration, 9 Flutter). Dashboard and API are running locally; no hosted deployment was performed.
+
+## Hosted release — 3 October 2026
+
+The web/API refinement is now deployed as commit `aa0a4df`. This supersedes the earlier local-only deployment status. Migration testing used an isolated Neon copy before production and preserved existing tickets and lookup identifiers. The 91 web/API tests, typecheck, lint and production builds passed again; Flutter was not rebuilt as part of this hosted release. All four hosted role login checks passed, as did USD/readable-reference and account-total consistency checks.
+
+Unlike the local fixture, hosted ABC1234 has no motoristId. A zero registered-vehicle count therefore matches the hosted relationship. No ownership was inferred from an infringement. Use the existing administrator link action after verifying the account assignment. See DEPLOYMENT.md for release IDs and operational details.

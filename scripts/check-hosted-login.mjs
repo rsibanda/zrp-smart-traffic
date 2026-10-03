@@ -64,7 +64,34 @@ try {
     step = `${role} authenticated profile and dashboard API`;
     const me = await request('/auth/me', { token: login.token });
     assert.equal(me.role, role);
-    await request(path, { token: login.token });
+    const dashboard = await request(path, { token: login.token });
+    if (role === 'USER') {
+      step = 'motorist references, currency and account totals';
+      const options = { token: login.token };
+      const vehicles = await request('/motorist/vehicles', options);
+      const tickets = await request('/motorist/infringements', options);
+      assert.equal(dashboard.currency, 'USD');
+      assert.equal(dashboard.registeredVehicles, vehicles.total);
+      assert.ok(
+        tickets.items.every((ticket) =>
+          /^INF-\d{4}-\d{6,}$/.test(ticket.displayReference),
+        ),
+      );
+      if (tickets.items.length === tickets.total) {
+        assert.equal(
+          dashboard.demeritPoints,
+          tickets.items.reduce((sum, ticket) => sum + ticket.demeritPoints, 0),
+        );
+        assert.equal(
+          dashboard.paidFines,
+          tickets.items.filter((ticket) => ticket.paymentStatus === 'PAID')
+            .length,
+        );
+      }
+      console.log(
+        'Motorist readable references, USD currency, vehicle count and ticket totals passed',
+      );
+    }
     if (role !== 'ADMIN')
       await request('/admin/users', { token: login.token, status: 403 });
     if (role === 'USER')
