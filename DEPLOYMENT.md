@@ -4,6 +4,16 @@ Status: free Render backend and Netlify frontend deployed. Hosted API workflows 
 Destination team: https://app.netlify.com/teams/rsibanda
 Repository: https://github.com/rsibanda/zrp-smart-traffic
 
+## Vehicle-management deployment — 5 October 2026
+
+Application commit `d8338b5` is live on the existing free Render and Netlify services. Render deployment `dep-db1r88gu01pc73fnnm20` is live; Netlify deployment `6ac3b492bb488a5a822e60cd` is ready. Includes motorist vehicle inventory/detail, link and unlink requests, nickname editing, and administrator request review.
+
+All nine migrations are applied. `20261005090000_vehicle_requests` passed on the expiring Neon copy `br-fragrant-grass-b1sm1np4` before production. Six accounts, two tickets, one evidence record, and the vehicle's existing ownership state were preserved. No passwords were changed, no records were reset and no paid resources were created.
+
+Validation: typecheck, lint, 48 API unit tests, 15 web tests, 34 local PostgreSQL integration tests and both production builds passed. The hosted login script also checks motorist request history and administrator review-queue access, including rejection of motorist access to the admin queue. All four role HTTP/API logins, profile/dashboard requests, permissions, logout, invalid-password rejection, CORS, currency, readable references and account totals passed. Public `/`, `/admin` and `/motorist/vehicles/ABC1234` serve the new frontend bundle with the correct backend origin. A successful SPA page response does not bypass the application's login or ownership checks.
+
+Existing mobile/source-document changes remain in the workspace; this release deploys the web/API. Browser-driven visual checks remain unverified following the earlier policy block. Existing hosted demo passwords and the sign-in instructions below still apply.
+
 ## Latest refinement deployment — 3 October 2026
 
 Application commit `aa0a4df` is live on both existing free hosts from `deployment/free-hosting`. Render deployment `dep-db0bs1gu01pc739mq1a0` is live and healthy; Netlify deployment `6ac0be7ecbb08b118e3ed59b` is ready. Includes USD formatting, readable ticket references, payment-method labels, stronger status cards and the expanded citation form.
