@@ -93,7 +93,7 @@ it('opens motorist services only after User sign-in and clears them on sign-out'
     target: { value: 'demo-test-only' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-  await screen.findByRole('heading', { name: 'Welcome, Demo User' });
+  await screen.findByRole('heading', { name: 'Welcome back, Demo User' });
   expect(screen.queryByText('Your activity')).toBeNull();
   expect(fetchMock.mock.calls.some(([url]) => url.includes('/offences'))).toBe(
     false,

@@ -1,3 +1,4 @@
+import { MotoristIcon, type MotoristIconName } from './MotoristIcon';
 import { VehicleManager } from './VehicleManager';
 import { useEffect, useRef, useState } from 'react';
 import { PublicPortal } from './PublicPortal';
@@ -61,6 +62,49 @@ type Summary = {
   paidFines: number;
   registeredVehicles: number;
 };
+const motoristPages = [
+  {
+    title: 'Dashboard',
+    mobile: 'Home',
+    path: '/motorist/dashboard',
+    icon: 'home',
+  },
+  {
+    title: 'My Infringements',
+    mobile: 'Fines',
+    path: '/motorist/infringements',
+    icon: 'fine',
+  },
+  {
+    title: 'Payments',
+    mobile: 'Payments',
+    path: '/motorist/payments',
+    icon: 'payment',
+  },
+  {
+    title: 'My Vehicles',
+    mobile: 'Vehicles',
+    path: '/motorist/vehicles',
+    icon: 'vehicle',
+  },
+  {
+    title: 'Profile',
+    mobile: 'Profile',
+    path: '/motorist/profile',
+    icon: 'profile',
+  },
+] as const;
+const secondaryPages = [
+  { title: 'Traffic Notices & Reports', path: '/motorist/notices' },
+  { title: 'My Reports', path: '/motorist/reports' },
+];
+const currentPage = () =>
+  [...motoristPages, ...secondaryPages].find(
+    (p) =>
+      window.location.pathname === p.path ||
+      (p.title === 'My Vehicles' &&
+        window.location.pathname.startsWith(p.path + '/')),
+  )?.title ?? 'Dashboard';
 const money = formatCurrency;
 const date = (value: string | null) =>
   value ? new Date(value).toLocaleString() : 'Not specified';
@@ -92,11 +136,7 @@ export function MotoristDashboard({
   user: { name: string };
   onSessionExpired: () => void;
 }) {
-  const [tab, setTab] = useState(
-    window.location.pathname.startsWith('/motorist/vehicles')
-      ? 'My Vehicles'
-      : 'Dashboard',
-  );
+  const [tab, setTab] = useState<string>(currentPage);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -126,16 +166,24 @@ export function MotoristDashboard({
   }, [receipt]);
   useEffect(() => {
     const pop = () => {
-      setTab(
-        window.location.pathname.startsWith('/motorist/vehicles')
-          ? 'My Vehicles'
-          : 'Dashboard',
-      );
+      setTab(currentPage());
+      setPage(1);
       setSelected(null);
     };
     window.addEventListener('popstate', pop);
     return () => window.removeEventListener('popstate', pop);
   }, []);
+  function navigate(title: string) {
+    const destination = [...motoristPages, ...secondaryPages].find(
+      (p) => p.title === title,
+    );
+    if (!destination) return;
+    window.history.pushState({}, '', destination.path);
+    setTab(title);
+    setPage(1);
+    setSelected(null);
+    setError('');
+  }
   async function refresh() {
     const s = await api('/motorist/dashboard');
     setSummary(s);
@@ -148,6 +196,8 @@ export function MotoristDashboard({
             ? 'incidents'
             : 'infringements';
     const data = await api(`/motorist/${endpoint}?page=${page}&pageSize=12`);
+    if (tab === 'Dashboard')
+      setPayments((await api('/motorist/payments?page=1&pageSize=3')).items);
     setTotal(data.total);
     if (endpoint === 'payments') setPayments(data.items);
     else if (endpoint === 'incidents') setIncidents(data.items);
@@ -170,7 +220,12 @@ export function MotoristDashboard({
         const data = await api(
           `/motorist/${endpoint}?page=${page}&pageSize=12`,
         );
+        const recentPayments =
+          tab === 'Dashboard'
+            ? await api('/motorist/payments?page=1&pageSize=3')
+            : null;
         if (!active) return;
+        if (recentPayments) setPayments(recentPayments.items);
         setSummary(s);
         setTotal(data.total);
         if (endpoint === 'payments') setPayments(data.items);
@@ -233,31 +288,23 @@ export function MotoristDashboard({
   }
   return (
     <div className="motorist-workspace">
-      <nav className="workspace-tabs" aria-label="Motorist services">
-        {[
-          'Dashboard',
-          'My Infringements',
-          'Payments',
-          'My Vehicles',
-          'Traffic Notices & Reports',
-          'My Reports',
-          'Profile',
-        ].map((item) => (
+      <nav className="motorist-nav" aria-label="Motorist services">
+        {motoristPages.map((item) => (
           <button
-            key={item}
-            aria-current={tab === item ? 'page' : undefined}
-            onClick={() => {
-              window.history.pushState(
-                {},
-                '',
-                item === 'My Vehicles' ? '/motorist/vehicles' : '/',
-              );
-              setTab(item);
-              setPage(1);
-              setSelected(null);
-            }}
+            key={item.title}
+            aria-label={item.title}
+            aria-current={
+              tab === item.title ||
+              (item.title === 'Profile' &&
+                secondaryPages.some((p) => p.title === tab))
+                ? 'page'
+                : undefined
+            }
+            onClick={() => navigate(item.title)}
           >
-            {item}
+            <MotoristIcon name={item.icon} />
+            <span className="desktop-label">{item.title}</span>
+            <span className="mobile-label">{item.mobile}</span>
           </button>
         ))}
       </nav>
@@ -271,6 +318,18 @@ export function MotoristDashboard({
           <h2>My Profile</h2>
           <p>{user.name}</p>
           <p>Motorist</p>
+          <h3>More services</h3>
+          <div className="secondary-services">
+            {secondaryPages.map((item) => (
+              <button
+                className="secondary"
+                key={item.title}
+                onClick={() => navigate(item.title)}
+              >
+                {item.title}
+              </button>
+            ))}
+          </div>
           <p>
             Vehicle links are verified and managed by an administrator. Ticket
             access can also be verified using your ticket reference and
@@ -283,8 +342,7 @@ export function MotoristDashboard({
           onTicket={(reference) =>
             void perform(async () => {
               const ticket = await api('/motorist/infringements/' + reference);
-              window.history.pushState({}, '', '/');
-              setTab('My Infringements');
+              navigate('My Infringements');
               setSelected(ticket);
             })
           }
@@ -296,109 +354,191 @@ export function MotoristDashboard({
         />
       ) : (
         <>
-          <section className="ledger-heading">
-            <span className="eyebrow">MOTORIST SERVICES</span>
-            <h2>{tab === 'Dashboard' ? `Welcome, ${user.name}` : tab}</h2>
-            <p>Account records refresh every 10 seconds.</p>
-          </section>
-          {!summary ? (
-            <p role="status">Loading your traffic records…</p>
-          ) : (
-            <div className="ledger-metrics">
-              {[
-                [
-                  'Total Payable',
-                  money(summary.totalPayable, summary.currency),
-                ],
-                ['Pending Fines', summary.pendingFines],
-                ['Demerit Points', `${summary.demeritPoints} pts`],
-                ['Paid Fines', summary.paidFines],
-                ['Registered Vehicles', summary.registeredVehicles],
-              ].map(([label, value]) => (
-                <div className="metric-card" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
+          <section className="motorist-welcome">
+            <h2
+              aria-label={
+                tab === 'Dashboard' ? `Welcome back, ${user.name}` : undefined
+              }
+            >
+              {tab === 'Dashboard' ? (
+                <>
+                  Welcome back
+                  <span className="desktop-welcome-name">, {user.name}</span>
+                </>
+              ) : (
+                tab
+              )}
+            </h2>
+            <p>
+              {tab === 'Dashboard'
+                ? 'Here is your traffic account overview.'
+                : 'Your account records refresh every 10 seconds.'}
+            </p>
+            {tab === 'Dashboard' &&
+              (!summary ? (
+                <p role="status">Loading your traffic records...</p>
+              ) : (
+                <div className="account-summary">
+                  {(
+                    [
+                      [
+                        'Total Payable',
+                        money(summary.totalPayable, summary.currency),
+                        'receipt',
+                        'payable',
+                        'My Infringements',
+                      ],
+                      [
+                        'Pending Fines',
+                        summary.pendingFines,
+                        'clock',
+                        'pending',
+                        'My Infringements',
+                      ],
+                      [
+                        'Demerit Points',
+                        summary.demeritPoints + ' pts',
+                        'shield',
+                        'points',
+                        'My Infringements',
+                      ],
+                      [
+                        'Registered Vehicles',
+                        summary.registeredVehicles,
+                        'vehicle',
+                        'vehicles',
+                        'My Vehicles',
+                      ],
+                    ] as const
+                  ).map(([label, value, icon, tone, destination]) => (
+                    <button
+                      className="account-summary-card"
+                      data-tone={tone}
+                      key={label}
+                      onClick={() => navigate(destination)}
+                    >
+                      <MotoristIcon name={icon as MotoristIconName} />
+                      <span>{label}</span>
+                      <strong>{value}</strong>
+                    </button>
+                  ))}
                 </div>
               ))}
-            </div>
-          )}
+          </section>
           {['Dashboard', 'My Infringements'].includes(tab) && (
             <section>
-              <h2>My Infringements</h2>
-              <p className="muted">
-                Configured reference amounts and points. Payment does not remove
-                demerit points.
-              </p>
+              <div className="section-heading">
+                <h2>
+                  {tab === 'Dashboard' ? (
+                    <>
+                      <span className="desktop-label">
+                        Outstanding Infringements
+                      </span>
+                      <span className="mobile-label">Recent Infringements</span>
+                    </>
+                  ) : (
+                    'My Infringements'
+                  )}
+                </h2>
+                {tab === 'Dashboard' && (
+                  <button
+                    className="text-action"
+                    onClick={() => navigate('My Infringements')}
+                  >
+                    View all<span className="sr-only"> infringements</span>
+                  </button>
+                )}
+              </div>
               {!tickets.length && (
                 <p className="empty-state">
-                  No active traffic infringements. Use Traffic Notices &amp;
-                  Reports to verify an existing ticket.
+                  No traffic infringements found. Ticket verification is
+                  available under Profile / Traffic Notices &amp; Reports.
                 </p>
               )}
-              <div className="ledger-grid">
-                {tickets.map((t) => (
-                  <article
-                    className="infringement-card"
-                    data-status={t.paymentStatus}
-                    key={t.reference}
-                  >
-                    <div className="card-title">
-                      <h3>{t.category || 'Traffic offence'}</h3>
-                      <StatusBadge value={t.paymentStatus} />
-                    </div>
-                    <p>
-                      <strong>{t.registration}</strong> · {date(t.issuedAt)}
-                    </p>
-                    <p className="reference ticket-reference">
-                      {ticketLabel(t)}
-                    </p>
-                    <p className="record-location">
-                      <span className="muted">Location</span> {t.location}
-                    </p>
-                    <p>
-                      <strong className="points">
-                        {t.demeritPoints} demerit points
-                      </strong>{' '}
-                      · <StatusBadge value={t.status} />
-                    </p>
-                    <div className="card-actions">
-                      <strong className="fine-amount">
-                        {money(t.amount, t.currency)}
-                      </strong>
-                      <button
-                        className="secondary"
-                        disabled={busy}
-                        onClick={() =>
-                          void perform(async () =>
-                            setSelected(
-                              await api(
-                                `/motorist/infringements/${t.reference}`,
-                              ),
-                            ),
-                          )
-                        }
-                      >
-                        View details
-                      </button>
-                      {t.paymentStatus === 'PAID' &&
-                        t.receiptPaymentReference && (
-                          <button
-                            disabled={busy}
-                            onClick={() =>
-                              void openReceipt(t.receiptPaymentReference!)
-                            }
-                          >
-                            View Receipt
-                          </button>
-                        )}
-                      {['PENDING', 'OVERDUE'].includes(t.paymentStatus) && (
-                        <button disabled={busy} onClick={() => begin(t)}>
-                          Pay Now
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                ))}
+              <div className="motorist-records">
+                {(tab === 'Dashboard' ? tickets.slice(0, 3) : tickets).map(
+                  (t) => (
+                    <article
+                      className="motorist-fine"
+                      data-status={t.paymentStatus}
+                      key={t.reference}
+                    >
+                      <span className="record-state-icon">
+                        <MotoristIcon
+                          name={
+                            t.paymentStatus === 'PAID'
+                              ? 'paid'
+                              : t.paymentStatus === 'PENDING'
+                                ? 'clock'
+                                : 'fine'
+                          }
+                        />
+                      </span>
+                      <div className="record-content">
+                        <div className="record-title">
+                          <h3>
+                            <button
+                              className="record-title-link"
+                              disabled={busy}
+                              onClick={() =>
+                                void perform(async () =>
+                                  setSelected(
+                                    await api(
+                                      '/motorist/infringements/' + t.reference,
+                                    ),
+                                  ),
+                                )
+                              }
+                            >
+                              {t.category || 'Traffic offence'}
+                            </button>
+                          </h3>
+                          <span className="ticket-tag">{ticketLabel(t)}</span>
+                        </div>
+                        <p className="record-meta">
+                          Vehicle: <strong>{t.registration}</strong>
+                          <span>&middot;</span>
+                          <time dateTime={t.issuedAt}>{date(t.issuedAt)}</time>
+                        </p>
+                        <p className="record-location">{t.location}</p>
+                        <p className="record-points">
+                          {t.demeritPoints} Demerit Points
+                        </p>
+                        <div className="record-footer">
+                          <div>
+                            <strong className="fine-amount">
+                              {money(t.amount, t.currency)}
+                            </strong>
+                            <span className="payment-state">
+                              {readable(t.paymentStatus)}
+                            </span>
+                          </div>
+                          {['PENDING', 'OVERDUE'].includes(t.paymentStatus) && (
+                            <button
+                              className="pay-action"
+                              disabled={busy}
+                              onClick={() => begin(t)}
+                            >
+                              Pay Now
+                            </button>
+                          )}
+                          {t.paymentStatus === 'PAID' &&
+                            t.receiptPaymentReference && (
+                              <button
+                                className="secondary"
+                                disabled={busy}
+                                onClick={() =>
+                                  void openReceipt(t.receiptPaymentReference!)
+                                }
+                              >
+                                View Receipt
+                              </button>
+                            )}
+                        </div>
+                      </div>
+                    </article>
+                  ),
+                )}
               </div>
             </section>
           )}
@@ -419,38 +559,62 @@ export function MotoristDashboard({
               ))}
             </section>
           )}
-          {tab === 'Payments' && (
-            <section>
-              <h2>Payment History</h2>
+          {['Dashboard', 'Payments'].includes(tab) && (
+            <section
+              className={
+                tab === 'Dashboard' ? 'recent-payments' : 'payment-history'
+              }
+            >
+              <div className="section-heading">
+                <h2>
+                  {tab === 'Dashboard' ? 'Recent Payments' : 'Payment History'}
+                </h2>
+                {tab === 'Dashboard' && (
+                  <button
+                    className="text-action"
+                    onClick={() => navigate('Payments')}
+                  >
+                    View all<span className="sr-only"> payments</span>
+                  </button>
+                )}
+              </div>
               {!payments.length && (
                 <p className="empty-state">No payment history available.</p>
               )}
               {payments.map((p) => (
                 <article
-                  className="infringement-card payment-card"
+                  className="motorist-payment"
                   data-status={p.status}
                   key={p.reference}
                 >
-                  <div className="card-title">
-                    <h3>
-                      {money(p.amount, p.currency)} ·{' '}
-                      {paymentMethodLabel(p.method)}
-                    </h3>
-                    <StatusBadge value={p.status} />
+                  <span className="record-state-icon">
+                    <MotoristIcon
+                      name={p.status === 'SUCCESS' ? 'paid' : 'payment'}
+                    />
+                  </span>
+                  <div className="payment-content">
+                    <div className="card-title">
+                      <h3>
+                        {money(p.amount, p.currency)} ·{' '}
+                        {paymentMethodLabel(p.method)}
+                      </h3>
+                      <StatusBadge value={p.status} />
+                    </div>
+                    <p className="muted payment-reference">
+                      Transaction: {p.reference}
+                    </p>
+                    <p>
+                      Ticket:{' '}
+                      <span className="reference">
+                        {p.ticketDisplayReference ?? 'Traffic ticket'}
+                      </span>
+                    </p>
+                    <p>{date(p.createdAt)}</p>
+                    {p.failureReason && <p>{p.failureReason}</p>}
                   </div>
-                  <p className="muted payment-reference">
-                    Transaction: {p.reference}
-                  </p>
-                  <p>
-                    Ticket:{' '}
-                    <span className="reference">
-                      {p.ticketDisplayReference ?? 'Traffic ticket'}
-                    </span>
-                  </p>
-                  <p>{date(p.createdAt)}</p>
-                  {p.failureReason && <p>{p.failureReason}</p>}
                   {p.status === 'SUCCESS' && (
                     <button
+                      className="secondary"
                       onClick={() => void openReceipt(p.reference)}
                       disabled={busy}
                     >
@@ -472,23 +636,25 @@ export function MotoristDashboard({
               ))}
             </section>
           )}
-          <div className="pagination">
-            <button
-              disabled={page === 1 || busy}
-              onClick={() => setPage(page - 1)}
-            >
-              Previous
-            </button>
-            <span>
-              Page {page} · {total} records
-            </span>
-            <button
-              disabled={page * 12 >= total || busy}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </button>
-          </div>
+          {tab !== 'Dashboard' && (
+            <div className="pagination">
+              <button
+                disabled={page === 1 || busy}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </button>
+              <span>
+                Page {page} · {total} records
+              </span>
+              <button
+                disabled={page * 12 >= total || busy}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </button>
+            </div>
+          )}
           {selected && (
             <section aria-label="Infringement details">
               <h2>{selected.category}</h2>

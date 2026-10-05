@@ -937,3 +937,456 @@ dialog::backdrop {
     display: none !important;
   }
 }
+/* Motorist account: shared light-theme reference layout. */
+.motorist-main {
+  max-width: 1120px;
+  margin-top: 16px;
+}
+.motorist-header {
+  padding-inline: max(24px, calc((100vw - 1072px) / 2));
+}
+.motorist-header h1 {
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+}
+.motorist-icon {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+}
+.motorist-nav {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 22px;
+}
+.motorist-nav button {
+  flex: 1;
+  background: #fff;
+  color: var(--navy);
+  border: 1px solid #e4e9ee;
+  border-radius: 8px;
+  padding: 12px 8px;
+  min-height: 46px;
+}
+.motorist-nav button[aria-current='page'] {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+  box-shadow: 0 3px 8px #142d401a;
+}
+.motorist-nav .motorist-icon,
+.motorist-workspace .mobile-label {
+  display: none;
+}
+.motorist-workspace > section,
+.motorist-welcome {
+  padding: 24px;
+  border-radius: 12px;
+}
+.motorist-welcome h2 {
+  font-size: 1.6rem;
+  letter-spacing: -0.035em;
+}
+.motorist-welcome > p {
+  font-size: 0.95rem;
+  margin: 4px 0 20px;
+}
+.account-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+.account-summary-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  min-width: 0;
+  background: #fff;
+  color: var(--navy);
+  padding: 18px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 158px;
+  box-shadow: 0 1px 3px #142d4005;
+}
+.account-summary-card:hover {
+  background: #f7fafc;
+  border-color: #91aaba;
+}
+.account-summary-card .motorist-icon {
+  color: #124c79;
+  margin-bottom: 12px;
+}
+.account-summary-card span {
+  font-size: 0.88rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.account-summary-card strong {
+  font-size: clamp(1.3rem, 2vw, 1.8rem);
+  line-height: 1.3;
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.account-summary-card[data-tone='payable'] strong {
+  color: #be342b;
+}
+.account-summary-card[data-tone='pending'] strong,
+.account-summary-card[data-tone='pending'] .motorist-icon {
+  color: #a65a00;
+}
+.account-summary-card[data-tone='vehicles'] strong {
+  color: #167044;
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.section-heading h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+.text-action {
+  background: transparent;
+  border: 0;
+  color: #14566a;
+  padding: 6px 0;
+  white-space: nowrap;
+  box-shadow: none;
+  font-size: 0.88rem;
+}
+.text-action:hover {
+  background: transparent;
+  color: #0c3d4b;
+  text-decoration: underline;
+}
+.motorist-records {
+  display: grid;
+  gap: 12px;
+}
+.motorist-fine {
+  --state: #586b7a;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--state);
+  border-radius: 9px;
+  padding: 18px;
+  background: #fff;
+}
+.motorist-fine[data-status='PENDING'] {
+  --state: #a65a00;
+}
+.motorist-fine[data-status='OVERDUE'] {
+  --state: #be342b;
+}
+.motorist-fine[data-status='PAID'] {
+  --state: #167044;
+}
+.record-state-icon {
+  color: var(--state, #167044);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.record-content,
+.payment-content {
+  flex: 1;
+  min-width: 0;
+}
+.record-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.record-title h3,
+.motorist-payment h3 {
+  font-size: 1.08rem;
+  margin: 0;
+}
+.record-title-link {
+  background: none;
+  color: var(--navy);
+  border: 0;
+  border-radius: 2px;
+  padding: 0;
+  text-align: left;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: 650;
+  min-height: 0;
+}
+.record-title-link:hover {
+  background: none;
+  color: #14566a;
+  text-decoration: underline;
+}
+.ticket-tag {
+  background: #eef2f6;
+  color: #40556b;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.record-meta {
+  display: flex;
+  gap: 4px 10px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 5px 0;
+}
+.motorist-fine .record-location {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 3px 0;
+}
+.record-points {
+  color: #945300;
+  font-size: 0.86rem;
+  font-weight: 600;
+  margin: 6px 0 15px;
+}
+.record-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.record-footer .fine-amount {
+  display: block;
+  font-size: 1.3rem;
+  color: var(--navy);
+  line-height: 1.3;
+}
+.payment-state {
+  display: block;
+  color: var(--state);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.motorist-workspace .pay-action {
+  background: #07518a;
+  border-color: #07518a;
+  border-radius: 9px;
+  min-width: 104px;
+  min-height: 44px;
+}
+.motorist-workspace .pay-action:hover {
+  background: #063c67;
+}
+.motorist-workspace .record-footer .secondary,
+.motorist-payment > button {
+  min-height: 44px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+.motorist-payment {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 14px;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  background: white;
+}
+.motorist-payment:first-of-type {
+  border-radius: 9px 9px 0 0;
+}
+.motorist-payment:last-child {
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 0 9px 9px;
+}
+.motorist-payment p {
+  margin: 3px 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.motorist-payment .card-title {
+  margin-bottom: 5px;
+  gap: 10px;
+}
+.motorist-payment[data-status='FAILED'] .record-state-icon {
+  color: #be342b;
+}
+.motorist-payment[data-status='PROCESSING'] .record-state-icon {
+  color: #a65a00;
+}
+.secondary-services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@media (max-width: 700px) {
+  .motorist-header {
+    padding: 26px 22px 22px;
+    gap: 22px;
+  }
+  .motorist-header > div:first-child {
+    width: 100%;
+  }
+  .motorist-header h1 {
+    font-size: 1.55rem;
+    max-width: 350px;
+    line-height: 1.22;
+    margin-top: 7px;
+  }
+  .motorist-header .session-info {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+  .motorist-header .session-identity strong {
+    font-size: 1.15rem;
+  }
+  .motorist-header .session-role {
+    font-size: 0.8rem;
+  }
+  .motorist-header .session-info button {
+    min-height: 44px;
+  }
+  .motorist-main {
+    padding: 0 10px;
+    margin: 12px auto 0;
+  }
+  .motorist-workspace {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  .motorist-main ~ .app-footer {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+  .motorist-workspace .desktop-label,
+  .desktop-welcome-name {
+    display: none;
+  }
+  .motorist-workspace .mobile-label {
+    display: inline;
+  }
+  .motorist-nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 20;
+    display: flex;
+    gap: 0;
+    margin: 0;
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -2px 12px #142d4008;
+  }
+  .motorist-nav button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    border: 0;
+    border-radius: 8px;
+    padding: 7px 2px;
+    min-height: 56px;
+    min-width: 0;
+    font-size: 0.7rem;
+  }
+  .motorist-nav button[aria-current='page'] {
+    color: var(--navy);
+    background: #edf4f7;
+    box-shadow: none;
+    font-weight: 700;
+  }
+  .motorist-nav .motorist-icon {
+    display: block;
+    width: 23px;
+    height: 23px;
+  }
+  .motorist-workspace > section,
+  .motorist-welcome {
+    padding: 18px 16px;
+    margin-bottom: 14px;
+  }
+  .motorist-welcome h2 {
+    font-size: 1.45rem;
+  }
+  .motorist-welcome > p {
+    font-size: 0.9rem;
+  }
+  .account-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .account-summary-card {
+    min-height: 150px;
+    padding: 16px 12px;
+  }
+  .account-summary-card strong {
+    font-size: 1.5rem;
+  }
+  .account-summary-card span {
+    font-size: 0.82rem;
+  }
+  .section-heading h2 {
+    font-size: 1.2rem;
+  }
+  .motorist-fine {
+    padding: 16px 12px;
+    gap: 12px;
+  }
+  .record-state-icon .motorist-icon {
+    width: 22px;
+    height: 22px;
+  }
+  .record-title h3 {
+    font-size: 1rem;
+  }
+  .ticket-tag {
+    font-size: 0.74rem;
+  }
+  .record-meta {
+    font-size: 0.8rem;
+  }
+  .record-points {
+    margin-bottom: 18px;
+    font-size: 0.8rem;
+  }
+  .record-footer {
+    flex-wrap: wrap;
+  }
+  .record-footer .fine-amount {
+    font-size: 1.2rem;
+  }
+  .record-footer button {
+    margin-left: auto;
+    padding: 10px 14px;
+  }
+  .recent-payments {
+    display: none;
+  }
+  .motorist-payment {
+    flex-wrap: wrap;
+    padding: 16px 12px;
+    gap: 10px;
+  }
+  .motorist-payment > button {
+    margin-left: auto;
+  }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

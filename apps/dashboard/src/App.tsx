@@ -196,7 +196,11 @@ export function App() {
   }
   return (
     <>
-      <header>
+      <header
+        className={
+          session?.user.role === 'USER' ? 'motorist-header' : undefined
+        }
+      >
         <div>
           <span className="eyebrow">TRAFFIC OPERATIONS</span>
           <h1>ZRP Smart Traffic Management System</h1>
@@ -215,7 +219,10 @@ export function App() {
           </div>
         )}
       </header>
-      <main aria-busy={busy || loading}>
+      <main
+        className={session?.user.role === 'USER' ? 'motorist-main' : undefined}
+        aria-busy={busy || loading}
+      >
         {loading && <p role="status">Refreshing records…</p>}
         {error && (
           <p role="alert" className="error">

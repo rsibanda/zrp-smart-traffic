@@ -8,7 +8,10 @@ import {
 } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { MotoristDashboard, receiptText } from './MotoristDashboard';
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.history.replaceState({}, '', '/');
+});
 it('uses linked records, retains a payment request key after connection loss, and sends only test last4', async () => {
   let paid = false,
     attempts = 0;
@@ -27,6 +30,7 @@ it('uses linked records, retains a payment request key after connection loss, an
   };
   const calls: unknown[] = [];
   const api = vi.fn(async (path: string, body?: unknown) => {
+    if (path.startsWith('/motorist/payments?')) return { items: [], total: 0 };
     if (path === '/motorist/dashboard')
       return {
         totalPayable: paid ? 0 : 80,
@@ -135,6 +139,7 @@ it('exports a receipt with an explicit simulation disclosure', () => {
 
 it('opens a paid ticket receipt directly and hides the opaque lookup key', async () => {
   const api = vi.fn(async (path: string) => {
+    if (path.startsWith('/motorist/payments?')) return { items: [], total: 0 };
     if (path === '/motorist/dashboard')
       return {
         totalPayable: 0,
@@ -197,4 +202,66 @@ it('opens a paid ticket receipt directly and hides the opaque lookup key', async
   expect(receipt.textContent).toContain('US$25.00');
   expect(screen.queryByText('opaque-secret-reference')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Pay Now' })).toBeNull();
+});
+
+it('uses five destinations, restores direct routes, and keeps reports under Profile', async () => {
+  window.history.replaceState({}, '', '/motorist/payments');
+  const api = vi.fn(async (path: string) => {
+    if (path === '/motorist/dashboard')
+      return {
+        totalPayable: 0,
+        pendingFines: 0,
+        demeritPoints: 4,
+        paidFines: 1,
+        registeredVehicles: 1,
+      };
+    if (path.startsWith('/motorist/payments?'))
+      return {
+        items: [
+          {
+            reference: 'PAY-2026-018822',
+            ticketDisplayReference: 'INF-2026-000125',
+            amount: '25',
+            method: 'INNBUCKS',
+            status: 'SUCCESS',
+            createdAt: '2026-10-05T09:00:00Z',
+          },
+        ],
+        total: 1,
+      };
+    return { items: [], total: 0 };
+  });
+  render(
+    <MotoristDashboard
+      api={api}
+      accountToken="test"
+      user={{ name: 'Sample Motorist' }}
+      onSessionExpired={() => {}}
+    />,
+  );
+  const nav = screen.getByRole('navigation', { name: 'Motorist services' });
+  expect(within(nav).getAllByRole('button')).toHaveLength(5);
+  expect(
+    within(nav)
+      .getByRole('button', { name: 'Payments' })
+      .getAttribute('aria-current'),
+  ).toBe('page');
+  await screen.findByText(/InnBucks/);
+  fireEvent.click(within(nav).getByRole('button', { name: 'Profile' }));
+  expect(window.location.pathname).toBe('/motorist/profile');
+  fireEvent.click(screen.getByRole('button', { name: 'My Reports' }));
+  expect(window.location.pathname).toBe('/motorist/reports');
+  await screen.findByRole('heading', { name: 'My Incident Reports' });
+  expect(within(nav).queryByRole('button', { name: 'My Reports' })).toBeNull();
+  window.history.replaceState({}, '', '/motorist/dashboard');
+  fireEvent.popState(window);
+  await screen.findByText('4 pts');
+  expect(
+    within(nav)
+      .getByRole('button', { name: 'Dashboard' })
+      .getAttribute('aria-current'),
+  ).toBe('page');
+  expect(screen.getByRole('heading', { name: 'Recent Payments' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'View all payments' }));
+  expect(window.location.pathname).toBe('/motorist/payments');
 });
