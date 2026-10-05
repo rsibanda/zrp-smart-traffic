@@ -367,6 +367,77 @@ export function addResponseContracts(document: OpenAPIObject) {
       notice: text,
     }),
   });
+  const linkRequest = object({
+    id: uuid,
+    registration: text,
+    kind: text,
+    status: text,
+    submittedAt: date,
+    reviewedAt: optional(date),
+  });
+  const linkedVehicle = object({
+    registrationNumber: text,
+    make: text,
+    model: text,
+    colour: text,
+    registrationStatus: text,
+    nickname: optional(text),
+    linkVerifiedAt: optional(date),
+  });
+  const vehicleTotals = {
+    linkedInfringements: count,
+    activeInfringements: count,
+    paidInfringements: count,
+    totalPayable: { type: 'number' } as SchemaObject,
+    paidAmount: { type: 'number' } as SchemaObject,
+    currency: text,
+  };
+  const vehicleCard = object({
+    ...linkedVehicle.properties,
+    ...vehicleTotals,
+    ownershipStatus: text,
+  });
+  const vehicleDetail = object({
+    ...vehicleCard.properties,
+    checkedAt: date,
+    statusSource: text,
+    infringements: page(motoristTicket),
+    history: array(linkRequest),
+  });
+  Object.assign(contracts, {
+    'get /motorist/vehicles': object({
+      ...page(vehicleCard).properties,
+      summary: object({
+        registeredVehicles: count,
+        activeInfringements: count,
+        totalPayable: { type: 'number' },
+        vehiclesRequiringAttention: count,
+        currency: text,
+      }),
+    }),
+    'get /motorist/vehicles/requests': page(linkRequest),
+    'post /motorist/vehicles/check': object({
+      registration: text,
+      ownershipStatus: text,
+      message: text,
+      vehicle: optional(linkedVehicle),
+    }),
+    'post /motorist/vehicles/link-request': linkRequest,
+    'post /motorist/vehicles/{vehicleId}/unlink-request': linkRequest,
+    'get /motorist/vehicles/{vehicleId}': vehicleDetail,
+    'get /motorist/vehicles/{vehicleId}/status': vehicleDetail,
+    'patch /motorist/vehicles/{vehicleId}': linkedVehicle,
+    'get /admin/vehicle-link-requests': page(
+      object({
+        ...linkRequest.properties,
+        motorist: object({ name: text, email: text }),
+        reviewNote: optional(text),
+      }),
+    ),
+    'post /admin/vehicle-link-requests/{id}/review': {
+      oneOf: [linkRequest, object({ status: text })],
+    },
+  });
   for (const [path, operations] of Object.entries(document.paths)) {
     for (const method of ['get', 'post', 'patch'] as const) {
       const operation = operations[method];

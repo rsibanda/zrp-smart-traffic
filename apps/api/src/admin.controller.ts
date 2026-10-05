@@ -60,7 +60,11 @@ export class AdminController {
         );
       await tx.vehicle.update({
         where: { id: vehicle.id },
-        data: { motoristId: user.id },
+        data: {
+          motoristId: user.id,
+          linkVerifiedAt: new Date(),
+          ...(vehicle.motoristId !== user.id ? { nickname: null } : {}),
+        },
       });
       await tx.auditEvent.create({
         data: {

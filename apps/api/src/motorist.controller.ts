@@ -132,57 +132,6 @@ export class MotoristController {
     });
     return { ...ledgerTicket(ticket), payments: payments.map(paymentView) };
   }
-  @Get('vehicles')
-  async vehicles(@Req() req: StaffRequest, @Query() q: PageQuery) {
-    const where = { motoristId: req.actor.id };
-    const [items, total] = await this.db.$transaction([
-      this.db.vehicle.findMany({
-        where,
-        select: {
-          registrationNumber: true,
-          make: true,
-          model: true,
-          colour: true,
-          registrationStatus: true,
-          offences: {
-            where: {
-              ticket: {
-                motoristId: req.actor.id,
-                status: 'ISSUED',
-                OR: [
-                  { publicAccess: null },
-                  { publicAccess: { paidAt: null } },
-                ],
-              },
-            },
-            select: { ticket: { select: { demoFineAmountSnapshot: true } } },
-          },
-        },
-        orderBy: { registrationNumber: 'asc' },
-        skip: (q.page - 1) * q.pageSize,
-        take: q.pageSize,
-      }),
-      this.db.vehicle.count({ where }),
-    ]);
-    return {
-      items: items.map(({ offences, ...vehicle }) => ({
-        ...vehicle,
-        activeInfringements: offences.length,
-        totalPayable:
-          offences.reduce(
-            (sum, offence) =>
-              sum +
-              Math.round(
-                Number(offence.ticket?.demoFineAmountSnapshot ?? 0) * 100,
-              ),
-            0,
-          ) / 100,
-      })),
-      total,
-      page: q.page,
-      pageSize: q.pageSize,
-    };
-  }
   @Get('incidents')
   async incidents(@Req() req: StaffRequest, @Query() q: PageQuery) {
     const where = { reportedBy: req.actor.id, source: 'PUBLIC_UNVERIFIED' };

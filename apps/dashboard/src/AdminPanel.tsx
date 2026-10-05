@@ -1,3 +1,4 @@
+import { VehicleRequestReview } from './VehicleManager';
 import { formatCurrency } from './presentation';
 import { Field } from './Field';
 import { roleLabel, auditLabel, StatusBadge } from './presentation';
@@ -179,6 +180,7 @@ export function AdminPanel({ api }: { api: Api }) {
           </fieldset>
         </form>
       </section>
+      <VehicleRequestReview api={api} />
       <section>
         <h3>Accounts and assignments</h3>
         <Field>

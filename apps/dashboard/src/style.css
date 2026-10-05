@@ -712,6 +712,55 @@ section > .field {
   color: #75510d;
   font-size: 0.9rem;
 }
+.status-badge[data-status='VERIFIED'],
+.status-badge[data-status='REGISTERED'] {
+  background: #e1f0e7;
+  color: #235c3c;
+}
+.status-badge[data-status='EXPIRED'],
+.status-badge[data-status='SUSPENDED'],
+.status-badge[data-status='REJECTED'] {
+  background: #fbe6e3;
+  color: #8b3026;
+}
+.vehicle-workspace form {
+  margin: 1rem 0;
+}
+.vehicle-workspace form > button {
+  margin-top: 0.8rem;
+}
+.vehicle-workspace .detail-grid {
+  margin: 1.5rem 0;
+}
+.vehicle-card .fine-amount {
+  display: block;
+  margin: 0.3rem 0;
+}
+.check-label {
+  display: flex;
+  gap: 0.65rem;
+  align-items: baseline;
+  margin-top: 0.75rem;
+}
+.check-label input {
+  width: auto;
+}
+@media (max-width: 430px) {
+  .vehicle-workspace .ledger-heading button {
+    width: 100%;
+  }
+  .vehicle-workspace .detail-grid {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+  .vehicle-workspace .detail-grid dd {
+    margin-bottom: 0.75rem;
+  }
+  .vehicle-workspace .card-actions button {
+    flex: 1 1 auto;
+    min-height: 44px;
+  }
+}
 .payment-reference {
   overflow-wrap: anywhere;
 }

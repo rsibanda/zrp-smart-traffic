@@ -1,3 +1,8 @@
+import {
+  VehicleAccountsService,
+  VehicleAccountsController,
+  VehicleRequestsController,
+} from './vehicle-accounts';
 import { Module } from '@nestjs/common';
 import { MotoristController } from './motorist.controller';
 import { PaymentsService } from './payments.service';
@@ -20,6 +25,8 @@ import { EvidenceController } from './evidence.controller';
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 5 }])],
   controllers: [
     MotoristController,
+    VehicleAccountsController,
+    VehicleRequestsController,
     HealthController,
     AuthController,
     TrafficController,
@@ -31,6 +38,7 @@ import { EvidenceController } from './evidence.controller';
   ],
   providers: [
     PrismaService,
+    VehicleAccountsService,
     SessionGuard,
     OffencesService,
     EvidenceStorage,

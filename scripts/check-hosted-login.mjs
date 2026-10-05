@@ -65,10 +65,18 @@ try {
     const me = await request('/auth/me', { token: login.token });
     assert.equal(me.role, role);
     const dashboard = await request(path, { token: login.token });
+    if (role === 'ADMIN') {
+      await request('/admin/vehicle-link-requests', { token: login.token });
+    }
     if (role === 'USER') {
       step = 'motorist references, currency and account totals';
       const options = { token: login.token };
       const vehicles = await request('/motorist/vehicles', options);
+      await request('/motorist/vehicles/requests', options);
+      await request('/admin/vehicle-link-requests', {
+        ...options,
+        status: 403,
+      });
       const tickets = await request('/motorist/infringements', options);
       assert.equal(dashboard.currency, 'USD');
       assert.equal(dashboard.registeredVehicles, vehicles.total);

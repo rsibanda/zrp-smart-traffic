@@ -48,6 +48,8 @@ model User {
   vehicles Vehicle[] @relation("MotoristVehicles")
   motoristTickets Ticket[] @relation("MotoristTickets")
   payments Payment[]
+  vehicleRequests VehicleLinkRequest[] @relation("VehicleRequester")
+  reviewedVehicleRequests VehicleLinkRequest[] @relation("VehicleReviewer")
 }
 model OfficerProfile {
   id String @id @default(uuid()) @db.Uuid
@@ -84,8 +86,36 @@ model Vehicle {
   driver Driver? @relation(fields: [driverId], references: [id])
   offences Offence[]
   motoristId String? @db.Uuid
+  nickname String?
+  linkVerifiedAt DateTime?
   motorist User? @relation("MotoristVehicles", fields: [motoristId], references: [id])
   @@index([motoristId])
+}
+
+enum VehicleRequestKind {
+  LINK
+  UNLINK
+}
+enum VehicleRequestStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+// Requests are review history; Vehicle.motoristId remains the sole ownership link.
+model VehicleLinkRequest {
+  id String @id @default(uuid()) @db.Uuid
+  motoristId String @db.Uuid
+  motorist User @relation("VehicleRequester", fields: [motoristId], references: [id], onDelete: Cascade)
+  registration String
+  kind VehicleRequestKind @default(LINK)
+  status VehicleRequestStatus @default(PENDING)
+  submittedAt DateTime @default(now())
+  reviewedAt DateTime?
+  reviewedBy String? @db.Uuid
+  reviewer User? @relation("VehicleReviewer", fields: [reviewedBy], references: [id])
+  reviewNote String?
+  @@index([motoristId, submittedAt])
+  @@index([status, submittedAt])
 }
 model OffenceCategory {
   id String @id @default(uuid()) @db.Uuid

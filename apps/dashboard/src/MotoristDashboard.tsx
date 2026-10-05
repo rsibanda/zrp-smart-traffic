@@ -1,3 +1,4 @@
+import { VehicleManager } from './VehicleManager';
 import { useEffect, useRef, useState } from 'react';
 import { PublicPortal } from './PublicPortal';
 import { Field } from './Field';
@@ -60,15 +61,6 @@ type Summary = {
   paidFines: number;
   registeredVehicles: number;
 };
-type Vehicle = {
-  activeInfringements: number;
-  totalPayable: number;
-  registrationNumber: string;
-  make: string;
-  model: string;
-  colour: string;
-  registrationStatus: string;
-};
 const money = formatCurrency;
 const date = (value: string | null) =>
   value ? new Date(value).toLocaleString() : 'Not specified';
@@ -100,11 +92,14 @@ export function MotoristDashboard({
   user: { name: string };
   onSessionExpired: () => void;
 }) {
-  const [tab, setTab] = useState('Dashboard');
+  const [tab, setTab] = useState(
+    window.location.pathname.startsWith('/motorist/vehicles')
+      ? 'My Vehicles'
+      : 'Dashboard',
+  );
   const [summary, setSummary] = useState<Summary | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [incidents, setIncidents] = useState<
     { type: string; location: string; status: string; createdAt: string }[]
   >([]);
@@ -129,6 +124,18 @@ export function MotoristDashboard({
     if (receipt) receiptDialog.current?.showModal();
     else receiptDialog.current?.close();
   }, [receipt]);
+  useEffect(() => {
+    const pop = () => {
+      setTab(
+        window.location.pathname.startsWith('/motorist/vehicles')
+          ? 'My Vehicles'
+          : 'Dashboard',
+      );
+      setSelected(null);
+    };
+    window.addEventListener('popstate', pop);
+    return () => window.removeEventListener('popstate', pop);
+  }, []);
   async function refresh() {
     const s = await api('/motorist/dashboard');
     setSummary(s);
@@ -143,11 +150,11 @@ export function MotoristDashboard({
     const data = await api(`/motorist/${endpoint}?page=${page}&pageSize=12`);
     setTotal(data.total);
     if (endpoint === 'payments') setPayments(data.items);
-    else if (endpoint === 'vehicles') setVehicles(data.items);
     else if (endpoint === 'incidents') setIncidents(data.items);
     else setTickets(data.items);
   }
   useEffect(() => {
+    if (tab === 'My Vehicles') return;
     let active = true;
     const load = async () => {
       try {
@@ -167,7 +174,6 @@ export function MotoristDashboard({
         setSummary(s);
         setTotal(data.total);
         if (endpoint === 'payments') setPayments(data.items);
-        else if (endpoint === 'vehicles') setVehicles(data.items);
         else if (endpoint === 'incidents') setIncidents(data.items);
         else setTickets(data.items);
       } catch (e) {
@@ -241,6 +247,11 @@ export function MotoristDashboard({
             key={item}
             aria-current={tab === item ? 'page' : undefined}
             onClick={() => {
+              window.history.pushState(
+                {},
+                '',
+                item === 'My Vehicles' ? '/motorist/vehicles' : '/',
+              );
               setTab(item);
               setPage(1);
               setSelected(null);
@@ -266,6 +277,18 @@ export function MotoristDashboard({
             verification code.
           </p>
         </section>
+      ) : tab === 'My Vehicles' ? (
+        <VehicleManager
+          api={api}
+          onTicket={(reference) =>
+            void perform(async () => {
+              const ticket = await api('/motorist/infringements/' + reference);
+              window.history.pushState({}, '', '/');
+              setTab('My Infringements');
+              setSelected(ticket);
+            })
+          }
+        />
       ) : tab === 'Traffic Notices & Reports' ? (
         <PublicPortal
           accountToken={accountToken}
@@ -374,32 +397,6 @@ export function MotoristDashboard({
                         </button>
                       )}
                     </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
-          {tab === 'My Vehicles' && (
-            <section>
-              <h2>Registered Vehicles</h2>
-              {!vehicles.length && (
-                <p className="empty-state">No registered vehicles found.</p>
-              )}
-              <div className="ledger-grid">
-                {vehicles.map((v) => (
-                  <article
-                    className="infringement-card"
-                    key={v.registrationNumber}
-                  >
-                    <h3>{v.registrationNumber}</h3>
-                    <p>
-                      {v.make} {v.model} · {v.colour}
-                    </p>
-                    <StatusBadge value={v.registrationStatus} />
-                    <p>
-                      {v.activeInfringements} active infringements ·{' '}
-                      {money(v.totalPayable)} outstanding
-                    </p>
                   </article>
                 ))}
               </div>
