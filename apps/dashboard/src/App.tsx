@@ -2,9 +2,8 @@ import { Field } from './Field';
 import { apiUrl, responseError, serviceUnavailable } from './api';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AdminPanel } from './AdminPanel';
-import { OperationsPanel } from './OperationsPanel';
+import { StaffWorkspace } from './OfficerWorkspace';
 import { MotoristDashboard } from './MotoristDashboard';
-import { CitationTerminal } from './CitationTerminal';
 import { EvidencePanel } from './EvidencePanel';
 import {
   roleLabel,
@@ -198,7 +197,9 @@ export function App() {
     <>
       <header
         className={
-          session?.user.role === 'USER' ? 'motorist-header' : undefined
+          ['USER', 'OFFICER'].includes(session?.user.role ?? '')
+            ? 'motorist-header'
+            : undefined
         }
       >
         <div>
@@ -220,7 +221,11 @@ export function App() {
         )}
       </header>
       <main
-        className={session?.user.role === 'USER' ? 'motorist-main' : undefined}
+        className={
+          ['USER', 'OFFICER'].includes(session?.user.role ?? '')
+            ? 'motorist-main'
+            : undefined
+        }
         aria-busy={busy || loading}
       >
         {loading && <p role="status">Refreshing records…</p>}
@@ -289,11 +294,12 @@ export function App() {
         ) : session.user.role === 'ADMIN' ? (
           <AdminPanel api={api} />
         ) : (
-          <>
-            {session.user.role === 'OFFICER' && (
-              <CitationTerminal api={api} token={session.token} />
-            )}
-            <OperationsPanel api={api} user={session.user} />
+          <StaffWorkspace
+            api={api}
+            token={session.token}
+            user={session.user}
+            onOpen={(id) => void open(id)}
+          >
             <section>
               <h2>
                 {session.user.role === 'SUPERVISOR'
@@ -584,7 +590,7 @@ export function App() {
                   )}
               </section>
             )}
-          </>
+          </StaffWorkspace>
         )}
       </main>
       <footer className="app-footer">Academic Prototype</footer>

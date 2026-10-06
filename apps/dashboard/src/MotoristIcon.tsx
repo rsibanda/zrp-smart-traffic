@@ -1,4 +1,5 @@
 export type MotoristIconName =
+  | 'checkpoint'
   | 'home'
   | 'fine'
   | 'payment'
@@ -9,6 +10,7 @@ export type MotoristIconName =
   | 'receipt'
   | 'paid';
 const paths: Record<MotoristIconName, string> = {
+  checkpoint: 'M9 3h6l4 17H5L9 3Zm-2 8h10M6 16h12M3 21h18',
   home: 'M3 11 12 3l9 8M5 10v11h5v-7h4v7h5V10',
   fine: 'm12 3 10 18H2L12 3Zm0 6v5m0 3v.1',
   payment: 'M3 5h18v14H3V5Zm0 4h18M6 15h4',

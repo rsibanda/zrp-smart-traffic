@@ -42,12 +42,18 @@ type Overview = {
 export function OperationsPanel({
   api,
   user,
+  initialTab = '',
+  hideNavigation = false,
+  paused = false,
 }: {
   api: Api;
+  initialTab?: string;
+  hideNavigation?: boolean;
+  paused?: boolean;
   user: { id: string; role: string };
 }) {
   const supervisor = user.role === 'SUPERVISOR';
-  const [tab, setTab] = useState('');
+  const [tab, setTab] = useState(initialTab);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -73,6 +79,7 @@ export function OperationsPanel({
     setTotal(result.total);
   }, [api, page, q, tab]);
   useEffect(() => {
+    if (paused) return;
     let active = true;
     const load = () =>
       void refresh().catch((e) => {
@@ -84,7 +91,7 @@ export function OperationsPanel({
       active = false;
       clearInterval(timer);
     };
-  }, [refresh]);
+  }, [refresh, paused]);
   async function perform(action: () => Promise<unknown>) {
     setBusy(true);
     setError('');
@@ -144,28 +151,30 @@ export function OperationsPanel({
   }
   return (
     <section aria-label="Operations" aria-busy={busy}>
-      <nav aria-label="Operational views">
-        {[
-          '',
-          ...(supervisor ? ['Overview'] : []),
-          'Incidents',
-          'Checkpoints',
-        ].map((name) => (
-          <button
-            key={name}
-            aria-pressed={tab === name}
-            onClick={() => {
-              setTab(name);
-              setPage(1);
-              setQ('');
-              setError('');
-              setSelected(null);
-            }}
-          >
-            {name || 'Offence review'}
-          </button>
-        ))}
-      </nav>
+      {!hideNavigation && (
+        <nav aria-label="Operational views">
+          {[
+            '',
+            ...(supervisor ? ['Overview'] : []),
+            'Incidents',
+            'Checkpoints',
+          ].map((name) => (
+            <button
+              key={name}
+              aria-pressed={tab === name}
+              onClick={() => {
+                setTab(name);
+                setPage(1);
+                setQ('');
+                setError('');
+                setSelected(null);
+              }}
+            >
+              {name || 'Offence review'}
+            </button>
+          ))}
+        </nav>
+      )}
       {error && (
         <p role="alert" className="error">
           {error}

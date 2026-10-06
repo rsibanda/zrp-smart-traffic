@@ -1,5 +1,5 @@
-import { formatCurrency, ticketLabel } from './presentation';
-import { useEffect, useRef, useState } from 'react';
+import { formatCurrency, ticketLabel, StatusBadge } from './presentation';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Field } from './Field';
 import { EvidencePanel } from './EvidencePanel';
 import { AccountApi } from './MotoristDashboard';
@@ -22,10 +22,13 @@ type Vehicle = {
 export function CitationTerminal({
   api,
   token,
+  onIssued,
 }: {
   api: AccountApi;
   token: string;
+  onIssued?: () => void;
 }) {
+  const formId = useId();
   const [categories, setCategories] = useState<Category[]>([]),
     [category, setCategory] = useState('');
   const [vehicle, setVehicle] = useState<Vehicle | null>(null),
@@ -90,154 +93,175 @@ export function CitationTerminal({
           {error}
         </p>
       )}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void perform(async () => {
-            const data = await api(
-              `/vehicles?registration=${encodeURIComponent(registration)}`,
-            );
-            setVehicle(data.items[0] ?? null);
-            if (!data.items.length) setError('No matching records.');
-          });
-        }}
-      >
-        <div className="form-grid citation-fields">
-          <Field>
-            Vehicle registration
-            <input
-              value={registration}
-              onChange={(e) => {
-                setRegistration(e.target.value);
-                setVehicle(null);
-              }}
-              placeholder="ABC1234"
-              required
-              disabled={busy || !!draft || uncertain}
-            />
-          </Field>
-          <button disabled={busy || !!draft || uncertain}>
-            Lookup vehicle
-          </button>
-        </div>
-      </form>
-      {vehicle && (
-        <>
-          <div className="vehicle-summary">
-            <h3>
-              {vehicle.registrationNumber} · {vehicle.make} {vehicle.model}
-            </h3>
-            <p>
-              {vehicle.driver?.fullName ?? 'Driver not recorded'} · Licence:{' '}
-              {vehicle.driver?.licenceStatus ?? 'Not recorded'}
-            </p>
-            <p>
-              {vehicle.motoristId
-                ? `Linked motorist: ${vehicle.motorist?.name ?? 'Account verified'}`
-                : 'Account not linked. Provide a ticket verification code after issue.'}
-            </p>
-          </div>
-          {!ticket && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const data = new FormData(e.currentTarget);
-                if (!pending.current)
-                  pending.current = {
-                    requestKey: crypto.randomUUID(),
-                    vehicleId: vehicle.id,
-                    categoryId: category,
-                    location: data.get('location'),
-                    notes: data.get('notes'),
-                    observedAt: new Date().toISOString(),
-                  };
-                void perform(async () => {
-                  setUncertain(true);
-                  const result = await api('/offences', pending.current);
-                  setDraft(result);
-                  setUncertain(false);
-                  preview.current?.showModal();
-                });
-              }}
-            >
-              <fieldset disabled={busy || !!draft || uncertain}>
-                <div className="form-grid citation-fields">
-                  <Field>
-                    Offence category
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      required
-                    >
-                      <option value="" disabled>
-                        Select an offence category
-                      </option>
-                      {categories.map((c) => (
-                        <option value={c.id} key={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field>
-                    Location
-                    <input
-                      name="location"
-                      required
-                      minLength={3}
-                      maxLength={200}
-                      placeholder="Street or intersection"
-                    />
-                  </Field>
-                  <Field>
-                    Officer notes (optional)
-                    <textarea
-                      name="notes"
-                      maxLength={2000}
-                      placeholder="Record the observed facts"
-                    />
-                  </Field>
-                </div>
-              </fieldset>
-              <div className="citation-calculation">
-                Fine:{' '}
-                <strong className="fine-amount">
-                  {formatCurrency(selected?.demoFineAmount)}
-                </strong>{' '}
-                · Demerit points:{' '}
-                <strong>{selected?.demeritPoints ?? 0}</strong> · Due within{' '}
-                {selected?.paymentDueDays ?? 30} days
+      <div className="officer-citation-layout">
+        <div className="officer-citation-inputs">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void perform(async () => {
+                const data = await api(
+                  `/vehicles?registration=${encodeURIComponent(registration)}`,
+                );
+                setVehicle(data.items[0] ?? null);
+                if (!data.items.length) setError('No matching records.');
+              });
+            }}
+          >
+            <div className="form-grid citation-fields">
+              <Field>
+                Vehicle registration
+                <input
+                  value={registration}
+                  onChange={(e) => {
+                    setRegistration(e.target.value);
+                    setVehicle(null);
+                  }}
+                  placeholder="ABC1234"
+                  required
+                  disabled={busy || !!draft || uncertain}
+                />
+              </Field>
+              <button disabled={busy || !!draft || uncertain}>
+                Lookup vehicle
+              </button>
+            </div>
+          </form>
+          {vehicle && (
+            <>
+              <div className="vehicle-summary">
+                <h3>
+                  {vehicle.registrationNumber} · {vehicle.make} {vehicle.model}
+                </h3>
+                <p>
+                  {vehicle.driver?.fullName ?? 'Driver not recorded'} · Licence:{' '}
+                  {vehicle.driver?.licenceStatus ?? 'Not recorded'}
+                </p>
+                <p>
+                  {vehicle.motoristId
+                    ? `Linked motorist: ${vehicle.motorist?.name ?? 'Account verified'}`
+                    : 'Account not linked. Provide a ticket verification code after issue.'}
+                </p>
               </div>
-              <p className="muted">
-                The selected category determines the fine and points.
-                Observation time is recorded when the draft is saved.
-              </p>
-              {!draft ? (
-                <button disabled={busy}>
-                  {uncertain ? 'Retry same draft' : 'Review Infringement'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => preview.current?.showModal()}
+              {!ticket && (
+                <form
+                  id={formId}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const data = new FormData(e.currentTarget);
+                    if (!pending.current)
+                      pending.current = {
+                        requestKey: crypto.randomUUID(),
+                        vehicleId: vehicle.id,
+                        categoryId: category,
+                        location: data.get('location'),
+                        notes: data.get('notes'),
+                        observedAt: new Date().toISOString(),
+                      };
+                    void perform(async () => {
+                      setUncertain(true);
+                      const result = await api('/offences', pending.current);
+                      setDraft(result);
+                      setUncertain(false);
+                      preview.current?.showModal();
+                    });
+                  }}
                 >
-                  Review saved draft
-                </button>
+                  <fieldset disabled={busy || !!draft || uncertain}>
+                    <div className="form-grid citation-fields">
+                      <Field>
+                        Offence category
+                        <select
+                          value={category}
+                          onChange={(e) => setCategory(e.target.value)}
+                          required
+                        >
+                          <option value="" disabled>
+                            Select an offence category
+                          </option>
+                          {categories.map((c) => (
+                            <option value={c.id} key={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field>
+                        Location
+                        <input
+                          name="location"
+                          required
+                          minLength={3}
+                          maxLength={200}
+                          placeholder="Street or intersection"
+                        />
+                      </Field>
+                      <Field>
+                        Officer notes (optional)
+                        <textarea
+                          name="notes"
+                          maxLength={2000}
+                          placeholder="Record the observed facts"
+                        />
+                      </Field>
+                    </div>
+                  </fieldset>
+                  <p className="muted">
+                    The selected category determines the fine and points.
+                    Observation time is recorded when the draft is saved.
+                  </p>
+                </form>
               )}
-            </form>
+              {draft && !ticket && (
+                <EvidencePanel
+                  api={api}
+                  token={token}
+                  offenceId={draft.id}
+                  draft={true}
+                  officer={true}
+                />
+              )}
+            </>
           )}
-          {draft && !ticket && (
-            <EvidencePanel
-              api={api}
-              token={token}
-              offenceId={draft.id}
-              draft={true}
-              officer={true}
-            />
-          )}
-        </>
-      )}
+        </div>
+        <aside className="officer-citation-summary">
+          <span>Ticket Reference</span>
+          <strong className="ticket-tag">
+            {ticket ? ticketLabel(ticket) : 'Assigned when issued'}
+          </strong>
+          <StatusBadge
+            value={ticket ? 'SUBMITTED' : draft ? 'DRAFT' : 'PENDING'}
+          />
+          <span>Calculated Fine</span>
+          <strong className="officer-fine-total">
+            {selected
+              ? formatCurrency(selected.demoFineAmount)
+              : 'Select an offence'}
+          </strong>
+          <span>Demerit Points</span>
+          <strong className="officer-points">
+            {selected ? selected.demeritPoints + ' Points' : 'Not selected'}
+          </strong>
+          <p>Review the saved draft and optional evidence before issuing.</p>
+          {!ticket &&
+            (!draft ? (
+              <button
+                form={formId}
+                type="submit"
+                disabled={busy || !vehicle || !selected}
+              >
+                {uncertain ? 'Retry same draft' : 'Issue & Send'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => preview.current?.showModal()}
+              >
+                Review saved draft
+              </button>
+            ))}
+        </aside>
+      </div>
       {ticket && (
         <div role="status">
           <h3>Infringement issued</h3>
@@ -305,6 +329,7 @@ export function CitationTerminal({
               void perform(async () => {
                 const result = await api(`/offences/${draft!.id}/submit`, {});
                 setTicket(result);
+                onIssued?.();
                 preview.current?.close();
               })
             }

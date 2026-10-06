@@ -68,7 +68,7 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
   fireEvent.change(screen.getByLabelText('Officer notes (optional)'), {
     target: { value: 'Observed speeding' },
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Review Infringement' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Issue & Send' }));
   const confirm = await screen.findByRole('dialog', {
     name: 'Issue this infringement?',
   });
@@ -79,7 +79,7 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
     within(confirm).getByRole('button', { name: 'Issue Infringement' }),
   );
   await screen.findByRole('heading', { name: 'Infringement issued' });
-  expect(screen.getByText('INF-2026-000125')).toBeTruthy();
+  expect(screen.getAllByText('INF-2026-000125').length).toBeGreaterThan(0);
   expect(screen.queryByText('ticket-reference')).toBeNull();
   expect(
     api.mock.calls.filter(([path]) => path.endsWith('/submit')),
