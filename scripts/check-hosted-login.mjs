@@ -65,6 +65,15 @@ try {
     const me = await request('/auth/me', { token: login.token });
     assert.equal(me.role, role);
     const dashboard = await request(path, { token: login.token });
+    if (role === 'SUPERVISOR') {
+      await request('/supervisor/summary', { token: login.token });
+      await request('/supervisor/payments', { token: login.token });
+      await request('/supervisor/vehicle-link-requests', {
+        token: login.token,
+      });
+    } else {
+      await request('/supervisor/summary', { token: login.token, status: 403 });
+    }
     if (role === 'ADMIN') {
       await request('/admin/vehicle-link-requests', { token: login.token });
     }

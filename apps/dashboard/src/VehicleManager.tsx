@@ -1,3 +1,4 @@
+import { VehicleApprovals } from './VehicleApprovals';
 import { useEffect, useRef, useState } from 'react';
 import type { Api } from './AdminPanel';
 import { Field } from './Field';
@@ -437,8 +438,9 @@ export function VehicleManager({
                 <button disabled={busy}>Save nickname</button>
               </form>
               <p>
-                Unlinking requires administrator review and no outstanding
-                infringements. Existing tickets remain on your account.
+                Unlinking requires supervisor or administrator review and no
+                outstanding infringements. Existing tickets remain on your
+                account.
               </p>
               <button
                 className="secondary"
@@ -615,125 +617,5 @@ export function VehicleManager({
 }
 
 export function VehicleRequestReview({ api }: { api: Api }) {
-  const [rows, setRows] = useState<
-      (LinkRequest & { motorist: { name: string; email: string } })[]
-    >([]),
-    [page, setPage] = useState(1),
-    [total, setTotal] = useState(0);
-  const [error, setError] = useState(''),
-    [busy, setBusy] = useState(false);
-  async function load() {
-    const data = await api(
-      `/admin/vehicle-link-requests?page=${page}&pageSize=10`,
-    );
-    setRows(data.items);
-    setTotal(data.total);
-  }
-  useEffect(() => {
-    let active = true;
-    const run = async () => {
-      try {
-        const data = await api(
-          `/admin/vehicle-link-requests?page=${page}&pageSize=10`,
-        );
-        if (active) {
-          setRows(data.items);
-          setTotal(data.total);
-        }
-      } catch (e) {
-        if (active) setError((e as Error).message);
-      }
-    };
-    void run();
-    const timer = setInterval(() => void run(), 10000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [api, page]);
-  return (
-    <section>
-      <h3>Vehicle Link Requests</h3>
-      <p>
-        Verify the motorist and supporting ownership information before
-        approving. This workflow never transfers another account’s vehicle or
-        historic tickets.
-      </p>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {!rows.length && <p>No vehicle link requests.</p>}
-      {rows.map((r) => (
-        <article className="infringement-card" key={r.id}>
-          <div className="card-title">
-            <h4>
-              {r.registration} · {readable(r.kind)}
-            </h4>
-            <StatusBadge value={r.status} />
-          </div>
-          <p>
-            {r.motorist.name} · {r.motorist.email}
-          </p>
-          <p>Submitted {date(r.submittedAt)}</p>
-          {r.status === 'PENDING' && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const data = new FormData(e.currentTarget);
-                const button = (e.nativeEvent as SubmitEvent)
-                  .submitter as HTMLButtonElement;
-                setBusy(true);
-                setError('');
-                void api(`/admin/vehicle-link-requests/${r.id}/review`, {
-                  status: button.value,
-                  note: data.get('note'),
-                  checked: data.get('checked') === 'on',
-                })
-                  .then(load)
-                  .catch((e) => setError(e.message))
-                  .finally(() => setBusy(false));
-              }}
-            >
-              <Field>
-                Review note
-                <input
-                  name="note"
-                  required
-                  minLength={3}
-                  maxLength={500}
-                  placeholder="Record the verification decision"
-                />
-              </Field>
-              <label className="check-label">
-                <input name="checked" type="checkbox" required /> I have checked
-                this request and the relevant account information.
-              </label>
-              <div className="card-actions">
-                <button value="VERIFIED" disabled={busy}>
-                  Approve
-                </button>
-                <button value="REJECTED" className="secondary" disabled={busy}>
-                  Reject
-                </button>
-              </div>
-            </form>
-          )}
-        </article>
-      ))}
-      <div className="pagination">
-        <button disabled={page === 1 || busy} onClick={() => setPage(page - 1)}>
-          Previous requests
-        </button>
-        <span>Page {page}</span>
-        <button
-          disabled={page * 10 >= total || busy}
-          onClick={() => setPage(page + 1)}
-        >
-          Next requests
-        </button>
-      </div>
-    </section>
-  );
+  return <VehicleApprovals api={api} base="/admin/vehicle-link-requests" />;
 }

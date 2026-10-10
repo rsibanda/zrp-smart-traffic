@@ -20,6 +20,8 @@ type User = {
   role: 'USER' | 'OFFICER' | 'SUPERVISOR' | 'ADMIN';
 };
 type Offence = {
+  observedAt?: string;
+  officer?: { name: string };
   paymentStatus?: string | null;
   id: string;
   location: string;
@@ -33,6 +35,8 @@ type Offence = {
     publicReference: string;
     displayReference?: string;
     demoFineAmountSnapshot: string;
+    demeritPointsSnapshot?: number;
+    motorist?: { name: string };
     status: string;
     payments?: { method: string; status: string; paidAt: string | null }[];
   };
@@ -48,6 +52,10 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<Offence[]>([]);
   const [selected, setSelected] = useState<Offence | null>(null);
+  const detailPanel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (selected) detailPanel.current?.scrollIntoView?.({ block: 'start' });
+  }, [selected?.id]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState('');
@@ -197,7 +205,7 @@ export function App() {
     <>
       <header
         className={
-          ['USER', 'OFFICER'].includes(session?.user.role ?? '')
+          ['USER', 'OFFICER', 'SUPERVISOR'].includes(session?.user.role ?? '')
             ? 'motorist-header'
             : undefined
         }
@@ -222,7 +230,7 @@ export function App() {
       </header>
       <main
         className={
-          ['USER', 'OFFICER'].includes(session?.user.role ?? '')
+          ['USER', 'OFFICER', 'SUPERVISOR'].includes(session?.user.role ?? '')
             ? 'motorist-main'
             : undefined
         }
@@ -431,11 +439,27 @@ export function App() {
               </div>
             </section>
             {selected && (
-              <section aria-label="Offence detail">
+              <section aria-label="Offence detail" ref={detailPanel}>
                 <h2>
                   {selected.vehicle.registrationNumber} ·{' '}
                   <StatusBadge value={selected.status} />
                 </h2>
+                <h3>{selected.category.name}</h3>
+                <p>
+                  Officer: {selected.officer?.name ?? 'Not recorded'} ·
+                  Motorist:{' '}
+                  {selected.ticket?.motorist?.name ?? 'No linked motorist'}
+                </p>
+                {selected.observedAt && (
+                  <p>
+                    Observed {new Date(selected.observedAt).toLocaleString()}
+                  </p>
+                )}
+                {selected.ticket && (
+                  <p>
+                    {selected.ticket.demeritPointsSnapshot ?? 0} demerit points
+                  </p>
+                )}
                 <p>{selected.location}</p>
                 <p>{selected.notes}</p>
                 {session.user.role === 'OFFICER' &&

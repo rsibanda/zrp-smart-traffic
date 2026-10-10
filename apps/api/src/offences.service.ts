@@ -31,10 +31,12 @@ export function canTransition(from: OffenceStatus, to: OffenceStatus) {
   );
 }
 const details = {
+  officer: { select: { name: true } },
   vehicle: true,
   category: true,
   ticket: {
     include: {
+      motorist: { select: { name: true } },
       publicAccess: { select: { paidAt: true, receiptReference: true } },
       payments: {
         select: { method: true, status: true, paidAt: true },

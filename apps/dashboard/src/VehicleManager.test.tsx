@@ -149,32 +149,55 @@ it('renders only stored vehicle fields, checks internal status and opens a linke
 });
 it('submits an administrator decision with an explicit verification attestation', async () => {
   const api = vi.fn(async (path: string) =>
-    path.includes('/review')
-      ? { status: 'VERIFIED' }
-      : {
-          items: [
-            {
-              id: 'r',
-              registration: 'ABC1234',
-              kind: 'LINK',
-              status: 'PENDING',
-              submittedAt: '2026-10-05T08:00:00Z',
-              motorist: {
-                name: 'Sample Motorist',
-                email: 'sample@example.invalid',
+    path.endsWith('/r')
+      ? {
+          id: 'r',
+          registration: 'ABC1234',
+          kind: 'LINK',
+          status: 'PENDING',
+          submittedAt: '2026-10-05T08:00:00Z',
+          motorist: {
+            name: 'Sample Motorist',
+            email: 'sample@example.invalid',
+          },
+          vehicle: {
+            make: 'Toyota',
+            model: 'Corolla',
+            colour: 'Silver',
+            registrationStatus: 'REGISTERED',
+          },
+          ownershipStatus: 'PENDING',
+          linkedToAnotherMotorist: false,
+          history: [],
+        }
+      : path.includes('/review')
+        ? { status: 'VERIFIED' }
+        : {
+            items: [
+              {
+                id: 'r',
+                registration: 'ABC1234',
+                kind: 'LINK',
+                status: 'PENDING',
+                submittedAt: '2026-10-05T08:00:00Z',
+                motorist: {
+                  name: 'Sample Motorist',
+                  email: 'sample@example.invalid',
+                },
               },
-            },
-          ],
-          total: 1,
-        },
+            ],
+            total: 1,
+          },
   );
   render(<VehicleRequestReview api={api} />);
-  await screen.findByText('ABC1234 · Link');
+  fireEvent.click(await screen.findByRole('button', { name: 'View Request' }));
+  await screen.findByRole('dialog');
   fireEvent.change(screen.getByLabelText('Review note'), {
     target: { value: 'Ownership evidence checked' },
   });
   fireEvent.click(screen.getByRole('checkbox'));
-  fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Approve Vehicle' }));
+  fireEvent.click(screen.getByRole('button', { name: /^Approve$/ }));
   expect(api).toHaveBeenCalledWith('/admin/vehicle-link-requests/r/review', {
     status: 'VERIFIED',
     note: 'Ownership evidence checked',

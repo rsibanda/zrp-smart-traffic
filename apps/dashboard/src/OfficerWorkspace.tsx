@@ -2,6 +2,7 @@
 import type { Api } from './AdminPanel';
 import { CitationTerminal } from './CitationTerminal';
 import { OperationsPanel } from './OperationsPanel';
+import { SupervisorWorkspace } from './SupervisorWorkspace';
 import { MotoristIcon, type MotoristIconName } from './MotoristIcon';
 import {
   formatCurrency,
@@ -139,10 +140,9 @@ export function StaffWorkspace({
 }) {
   if (user.role !== 'OFFICER')
     return (
-      <>
-        <OperationsPanel api={api} user={user} />
+      <SupervisorWorkspace api={api} user={user} onOpen={onOpen}>
         {children}
-      </>
+      </SupervisorWorkspace>
     );
   return (
     <OfficerWorkspace api={api} token={token} user={user} onOpen={onOpen}>

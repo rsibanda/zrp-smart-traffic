@@ -39,7 +39,7 @@ class NicknameDto {
   @Length(0, 60)
   nickname!: string;
 }
-class ReviewVehicleDto {
+export class ReviewVehicleDto {
   @ApiProperty({ enum: ['VERIFIED', 'REJECTED'] })
   @IsIn(['VERIFIED', 'REJECTED'])
   status!: 'VERIFIED' | 'REJECTED';
@@ -52,7 +52,7 @@ class ReviewVehicleDto {
   note!: string;
   @ApiProperty({
     description:
-      'Administrator confirms the account and supporting ownership information have been checked.',
+      'Reviewer confirms the account and supporting ownership information have been checked.',
   })
   @IsBoolean()
   @Equals(true)
@@ -232,7 +232,7 @@ export class VehicleAccountsService {
           ownershipStatus: 'PENDING',
           vehicle: null,
           message:
-            'Ownership verification required. Submit a link request for administrator review. Vehicle details are available only after approval.',
+            'Ownership verification required. Submit a link request for supervisor or administrator review. Vehicle details are available only after approval.',
         };
   }
   request(actor: string, registration: string, kind: 'LINK' | 'UNLINK') {
@@ -326,13 +326,87 @@ export class VehicleAccountsService {
               }
             : {}),
         },
-        orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
+        orderBy: [
+          ...(!actor ? [{ status: 'asc' as const }] : []),
+          { submittedAt: 'desc' },
+          { id: 'desc' },
+        ],
         skip: (q.page - 1) * q.pageSize,
         take: q.pageSize,
       }),
       this.db.vehicleLinkRequest.count({ where }),
     ]);
-    return { items, total, page: q.page, pageSize: q.pageSize };
+    const vehicles = actor
+      ? []
+      : await this.db.vehicle.findMany({
+          where: {
+            registrationNumber: { in: items.map((r) => r.registration) },
+          },
+          select: vehicleFields,
+        });
+    return {
+      items: actor
+        ? items
+        : items.map((r) => ({
+            ...r,
+            vehicle:
+              vehicles.find((v) => v.registrationNumber === r.registration) ??
+              null,
+          })),
+      total,
+      page: q.page,
+      pageSize: q.pageSize,
+    };
+  }
+  async requestDetail(reviewer: string, id: string) {
+    return this.db.$transaction(async (tx) => {
+      const request = await tx.vehicleLinkRequest.findUnique({
+        where: { id },
+        select: {
+          ...requestFields,
+          motoristId: true,
+          motorist: { select: { name: true, email: true } },
+          reviewNote: true,
+        },
+      });
+      if (!request) throw new NotFoundException('Request not found');
+      const vehicle = await tx.vehicle.findUnique({
+        where: { registrationNumber: request.registration },
+        select: { ...vehicleFields, motoristId: true },
+      });
+      const history = await tx.vehicleLinkRequest.findMany({
+        where: {
+          motoristId: request.motoristId,
+          registration: request.registration,
+        },
+        select: {
+          ...requestFields,
+          reviewNote: true,
+          reviewer: { select: { name: true } },
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: 20,
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: reviewer,
+          action: 'VEHICLE_REQUEST_VIEWED',
+          entityType: 'VehicleLinkRequest',
+          entityId: id,
+        },
+      });
+      const { motoristId, ...safeRequest } = request;
+      const { motoristId: owner, ...safeVehicle } = vehicle ?? {
+        motoristId: null,
+      };
+      return {
+        ...safeRequest,
+        vehicle: vehicle ? safeVehicle : null,
+        linkedToAnotherMotorist: Boolean(owner && owner !== motoristId),
+        ownershipStatus: owner === motoristId ? 'VERIFIED' : 'PENDING',
+        history,
+      };
+    });
   }
   review(reviewer: string, id: string, dto: ReviewVehicleDto) {
     return serial(this.db, async (tx) => {
@@ -473,6 +547,12 @@ export class VehicleRequestsController {
   constructor(private readonly service: VehicleAccountsService) {}
   @Get() requests(@Query() q: PageQuery) {
     return this.service.requests(null, q);
+  }
+  @Get(':id') detail(
+    @Req() r: StaffRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.service.requestDetail(r.actor.id, id);
   }
   @Post(':id/review') review(
     @Req() r: StaffRequest,

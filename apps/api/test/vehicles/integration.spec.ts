@@ -339,4 +339,124 @@ describe('Verified motorist vehicle management', () => {
         .nickname,
     ).toBeNull();
   });
+  it('lets supervisors view and approve requests with audit, ownership isolation and payment scope', async () => {
+    const pending = await call('post', '/motorist/vehicles/link-request')
+      .send({ registration: plate })
+      .expect(201);
+    const path = `/supervisor/vehicle-link-requests/${pending.body.id}`;
+    for (const role of ['USER', 'OTHER', 'OFFICER']) {
+      await call('get', path, role).expect(403);
+      await call('post', `${path}/review`, role).send(review).expect(403);
+      await call('get', '/supervisor/payments', role).expect(403);
+    }
+    const queue = await call(
+      'get',
+      '/supervisor/vehicle-link-requests',
+      'SUPERVISOR',
+    ).expect(200);
+    expect(
+      queue.body.items.some((r: { id: string }) => r.id === pending.body.id),
+    ).toBe(true);
+    const detail = await call('get', path, 'SUPERVISOR').expect(200);
+    expect(detail.body.vehicle.make).toBe('Test');
+    expect(detail.body.motorist.name).toBe('Test USER');
+    expect(detail.body.motoristId).toBeUndefined();
+    expect(detail.body.vehicle.motoristId).toBeUndefined();
+    expect(detail.body.linkedToAnotherMotorist).toBe(false);
+    await call('post', `${path}/review`, 'SUPERVISOR')
+      .send({ ...review, supervisorId: users.ADMIN })
+      .expect(400);
+    await call('post', `${path}/review`, 'SUPERVISOR')
+      .send({ ...review, checked: false })
+      .expect(400);
+    await call('post', `${path}/review`, 'SUPERVISOR').send(review).expect(201);
+    await call('post', `${path}/review`, 'SUPERVISOR').send(review).expect(201);
+    expect((await call('get', '/motorist/vehicles')).body.total).toBe(1);
+    expect(
+      (await call('get', '/motorist/dashboard')).body.registeredVehicles,
+    ).toBe(1);
+    const conflict = await call(
+      'post',
+      '/motorist/vehicles/link-request',
+      'OTHER',
+    )
+      .send({ registration: plate })
+      .expect(201);
+    const conflictPath = `/supervisor/vehicle-link-requests/${conflict.body.id}`;
+    expect(
+      (await call('get', conflictPath, 'SUPERVISOR')).body
+        .linkedToAnotherMotorist,
+    ).toBe(true);
+    await call('post', `${conflictPath}/review`, 'SUPERVISOR')
+      .send(review)
+      .expect(409);
+    await call('post', `${conflictPath}/review`, 'SUPERVISOR')
+      .send({ ...review, status: 'REJECTED' })
+      .expect(201);
+    expect((await call('get', '/motorist/vehicles', 'OTHER')).body.total).toBe(
+      0,
+    );
+    expect(
+      (
+        await call('get', '/motorist/vehicles/requests', 'OTHER')
+      ).body.items.find((r: { id: string }) => r.id === conflict.body.id)
+        .status,
+    ).toBe('REJECTED');
+    const events = await db.auditEvent.findMany({
+      where: { entityId: pending.body.id },
+    });
+    expect(
+      events.filter((e) => e.action === 'VEHICLE_REQUEST_VERIFIED'),
+    ).toHaveLength(1);
+    expect(
+      events.find((e) => e.action === 'VEHICLE_REQUEST_VIEWED')?.actorId,
+    ).toBe(users.SUPERVISOR);
+    expect(
+      events.find((e) => e.action === 'VEHICLE_REQUEST_VERIFIED')?.actorId,
+    ).toBe(users.SUPERVISOR);
+    const history = await call(
+      'get',
+      '/supervisor/payments',
+      'SUPERVISOR',
+    ).expect(200);
+    expect(history.body.items[0]).toMatchObject({
+      amount: '80',
+      method: 'ECOCASH',
+      status: 'SUCCESS',
+    });
+    expect(history.body.items[0].ticket.displayReference).toMatch(/^INF-/);
+    expect(history.body.items[0].last4).toBeUndefined();
+    expect(history.body.items[0].motoristId).toBeUndefined();
+    const summary = await call(
+      'get',
+      '/supervisor/summary',
+      'SUPERVISOR',
+    ).expect(200);
+    expect(summary.body.paymentsToday).toBe(80);
+    const id = randomUUID();
+    ids.push(id);
+    await db.user.create({
+      data: {
+        id,
+        name: 'Other command centre',
+        email: `${id}@example.invalid`,
+        role: 'SUPERVISOR',
+        passwordHash: 'not-a-login-hash',
+      },
+    });
+    tokens.SECOND = randomBytes(32).toString('hex');
+    await db.session.create({
+      data: {
+        userId: id,
+        tokenHash: hashToken(tokens.SECOND),
+        expiresAt: new Date(Date.now() + 3600000),
+      },
+    });
+    expect(
+      (await call('get', '/supervisor/payments', 'SECOND')).body.total,
+    ).toBe(0);
+    expect(
+      (await call('get', '/supervisor/summary', 'SECOND')).body.paymentsToday,
+    ).toBe(0);
+  });
 });

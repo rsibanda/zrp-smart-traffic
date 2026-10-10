@@ -4,6 +4,7 @@ import {
   VehicleRequestsController,
 } from './vehicle-accounts';
 import { Module } from '@nestjs/common';
+import { SupervisorController } from './supervisor.controller';
 import { MotoristController } from './motorist.controller';
 import { PaymentsService } from './payments.service';
 import { EvidenceStorage } from './evidence-storage';
@@ -24,6 +25,7 @@ import { EvidenceController } from './evidence.controller';
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 5 }])],
   controllers: [
+    SupervisorController,
     MotoristController,
     VehicleAccountsController,
     VehicleRequestsController,

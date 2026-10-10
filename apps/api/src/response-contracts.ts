@@ -114,6 +114,7 @@ const ticket = object({
 const offence = object({
   id: uuid,
   officerId: uuid,
+  officer: object({ name: text }),
   supervisorId: uuid,
   vehicleId: uuid,
   categoryId: uuid,
@@ -133,7 +134,12 @@ const offence = object({
   reviewNotes: optional(text),
   vehicle,
   category,
-  ticket: optional(ticket),
+  ticket: optional(
+    object({
+      ...ticket.properties,
+      motorist: optional(object({ name: text })),
+    }),
+  ),
 });
 const incident = object({
   id: uuid,
@@ -432,11 +438,53 @@ export function addResponseContracts(document: OpenAPIObject) {
         ...linkRequest.properties,
         motorist: object({ name: text, email: text }),
         reviewNote: optional(text),
+        vehicle: optional(linkedVehicle),
       }),
     ),
     'post /admin/vehicle-link-requests/{id}/review': {
       oneOf: [linkRequest, object({ status: text })],
     },
+  });
+  const requestDetail = object({
+    ...linkRequest.properties,
+    motorist: object({ name: text, email: text }),
+    reviewNote: optional(text),
+    vehicle: optional(linkedVehicle),
+    linkedToAnotherMotorist: flag,
+    ownershipStatus: text,
+    history: array(
+      object({
+        ...linkRequest.properties,
+        reviewNote: optional(text),
+        reviewer: optional(object({ name: text })),
+      }),
+    ),
+  });
+  Object.assign(contracts, {
+    'get /admin/vehicle-link-requests/{id}': requestDetail,
+    'get /supervisor/vehicle-link-requests':
+      contracts['get /admin/vehicle-link-requests'],
+    'get /supervisor/vehicle-link-requests/{id}': requestDetail,
+    'post /supervisor/vehicle-link-requests/{id}/review':
+      contracts['post /admin/vehicle-link-requests/{id}/review'],
+    'get /supervisor/summary': object({
+      paymentsToday: { type: 'number' },
+      currency: text,
+      pendingVehicleApprovals: count,
+    }),
+    'get /supervisor/payments': page(
+      object({
+        paymentReference: text,
+        amount: text,
+        currency: text,
+        method: text,
+        status: text,
+        createdAt: date,
+        paidAt: optional(date),
+        motorist: object({ name: text }),
+        ticket: object({ displayReference: text }),
+      }),
+    ),
   });
   for (const [path, operations] of Object.entries(document.paths)) {
     for (const method of ['get', 'post', 'patch'] as const) {
