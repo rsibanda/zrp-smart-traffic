@@ -61,3 +61,9 @@ Sign in as Supervisor, then inspect `/supervisor/dashboard`, `/supervisor/review
 Results will be recorded after the full verification run. Coverage includes existing login/review/incident/checkpoint flows, supervisor vehicle approval/rejection, conflicting ownership, session-derived audit identity, payment assignment isolation, and web/native navigation and confirmation. Native layout tests render at 375, 390 and 430 pixels; optional local screenshots are saved under ignored `.tools`.
 
 Desktop browser pixel inspection is not claimed. Automated browser launch was unavailable under the environment's earlier approval-review restriction. Native rendered screenshots are inspected directly; React interaction tests validate the web controls.
+
+### Release validation — 10 October 2026
+
+Typecheck, lint, 48 API unit tests, 35 local PostgreSQL integration tests, 21 web tests and both production builds passed. Local PostgreSQL completed recovery after an interrupted shutdown before integration testing; no reset was performed. The first web run found an incorrect `/alerts` mock response in the supervisor navigation test. Correcting that mock to the existing array response contract resolved the failure and the entire web suite passed again. No application API contract change was needed for that correction.
+
+Application source is committed as `0291f7f` on `deployment/free-hosting`. No database migration or reseed is required. Hosted deployment and smoke-check results are recorded in DEPLOYMENT.md; browser visual acceptance is separate from API and component-test validation.

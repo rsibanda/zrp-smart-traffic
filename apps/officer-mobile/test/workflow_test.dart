@@ -70,6 +70,7 @@ void main() {
         result = {
           'id': 'ticket',
           'publicReference': 'DEMO-unique-reference',
+          'displayReference': 'INF-2026-000125',
           'demoFineAmountSnapshot': '25.00',
           'status': 'ISSUED'
         };
@@ -85,7 +86,7 @@ void main() {
     });
     await tester.pumpWidget(OfficerApp(client: client));
     Future<void> tap(String text) async {
-      final finder = find.text(text);
+      final finder = find.text(text).last;
       await tester.ensureVisible(finder);
       await tester.tap(finder);
       await tester.pumpAndSettle();
@@ -102,6 +103,8 @@ void main() {
     await tap('Sign in');
     await fill('Vehicle registration', 'DEMO001');
     await tap('Find vehicle');
+    await tap('Offence category');
+    await tap('Fictional category');
     expect(locationCalls, isEmpty);
     await tap('Use location once for offence (optional)');
     expect(locationCalls,
@@ -111,19 +114,22 @@ void main() {
             'Location permission denied. Manual entry remains available.'),
         findsOneWidget);
     await fill('Manual location', 'Fictional training area');
-    await fill('Observation notes', 'Fictional observation');
-    await tap('Save draft for preview');
+    await fill('Observation notes (optional)', 'Fictional observation');
+    await tap('Review Infringement');
     await tap('Retry saving same draft');
     expect(draftRequests.length, 2);
     expect(draftRequests[0], draftRequests[1]);
     await tap('Edit saved draft');
-    await fill('Observation notes', 'Corrected fictional observation');
+    await fill(
+        'Observation notes (optional)', 'Corrected fictional observation');
     await tap('Save draft changes');
-    await tap('Issue traffic ticket / retry same submission');
+    await tap('Issue & Send');
+    await tap('Issue Infringement');
     final reference = find.byWidgetPredicate((widget) =>
         widget is SelectableText &&
-        widget.data == 'Reference: DEMO-unique-reference');
+        widget.data == 'Reference: INF-2026-000125');
     expect(reference, findsOneWidget);
+    await tap('Incidents');
     await fill('Incident location', 'Fictional intersection');
     await fill('Incident description', 'Fictional accident report');
     await tap('Submit Incident Report');

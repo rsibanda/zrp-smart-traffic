@@ -52,3 +52,11 @@ Real Chrome checks passed for administrator account management, supervisor analy
 Automated WCAG checks reported zero violations for login, administrator, supervisor and motorist views, including login at 390px without horizontal overflow. One initial browser run encountered the existing login rate limit; a later rerun passed without weakening throttling. Android device acceptance remains subject to the existing Windows emulator acceleration prerequisite; widget tests do not substitute for device acceptance.
 
 The updated Android debug APK also built successfully (442.4 seconds), including the new branding, footer, labels and status badges.
+
+## UI polish follow-up
+
+Polished the web role interfaces using the existing navy/teal palette: header identity hierarchy, card spacing, typography, action buttons, grouped forms, filters, table spacing/hover/actions, restrained badges, empty states and responsive layouts. Supervisor figures now precede alert publishing. The new `apps/dashboard/src/Field.tsx` displays existing native validation messages below fields with accessible associations; it does not change input constraints or submission logic. Scrollable tables have labelled, keyboard-focusable regions.
+
+Files: dashboard `style.css`, `Field.tsx`, `App.tsx`, `AdminPanel.tsx`, `OperationsPanel.tsx`, `PublicPortal.tsx`, `AlertsPanel.tsx`, `EvidencePanel.tsx`, and `scripts/check-accessibility.mjs`. Backend contracts, data, permissions and business logic are unchanged. The Flutter application is outside this web polish increment.
+
+Verification: lint, typecheck, 37 API unit tests, three dashboard tests, 18 integration tests and API/web builds passed. Real-browser inline validation appeared for an invalid field and cleared after correction. Automated accessibility checks passed for all four roles at 1280px, 768px and 390px, plus login, with no page-level horizontal overflow. The initial audit-table keyboard scrolling issue was fixed before the successful rerun. Screenshots are stored locally under `.tools/polish-*-desktop.png` and `.tools/polish-*-mobile.png`.
