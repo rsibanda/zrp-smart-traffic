@@ -638,7 +638,9 @@ Future<void> showReceipt(
     final r = await api('/motorist/payments/$reference/receipt');
     if (!context.mounted) return;
     final text = [
-      'ZRP Smart Traffic Management System',
+      productEyebrow,
+      productName,
+      productSubtitle,
       'PAYMENT RECEIPT',
       'Receipt: ${r['receiptReference']}',
       'Transaction: ${r['reference']}',

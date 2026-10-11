@@ -444,18 +444,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('TRAFFIC OPERATIONS',
-                          style: TextStyle(
-                              color: Color(0xffb4dce5),
-                              letterSpacing: 2,
-                              fontSize: 11)),
-                      const SizedBox(height: 8),
-                      const Text('ZRP Smart Traffic Management System',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 25,
-                              fontWeight: FontWeight.w700,
-                              height: 1.2)),
+                      const ProductBrand(),
                       const SizedBox(height: 22),
                       Row(children: [
                         Expanded(

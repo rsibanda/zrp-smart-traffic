@@ -110,7 +110,9 @@ const date = (value: string | null) =>
   value ? new Date(value).toLocaleString() : 'Not specified';
 export function receiptText(r: Receipt) {
   return [
-    'ZRP Smart Traffic Management System',
+    'TRAFFIC OPERATIONS',
+    'Smart Traffic',
+    'In support of ZRP',
     'PAYMENT RECEIPT',
     `Receipt: ${r.receiptReference}`,
     `Transaction: ${r.reference}`,

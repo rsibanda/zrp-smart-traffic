@@ -26,7 +26,7 @@ class OfficerApp extends StatelessWidget {
   final http.Client? client;
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'ZRP Smart Traffic',
+        title: productName,
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
             colorSchemeSeed: const Color(0xff14566a),
@@ -727,7 +727,9 @@ class _OfficerScreenState extends State<OfficerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: activityWidgets()))
           : Scaffold(
-              appBar: AppBar(title: const Text('ZRP Smart Traffic')),
+              appBar: AppBar(
+                  toolbarHeight: 104,
+                  title: const ProductBrand(onNavy: false, compact: true)),
               body: SafeArea(
                   child: ListView(padding: const EdgeInsets.all(20), children: [
                 if (busy) const LinearProgressIndicator(),

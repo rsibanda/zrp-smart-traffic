@@ -212,7 +212,8 @@ export function App() {
       >
         <div>
           <span className="eyebrow">TRAFFIC OPERATIONS</span>
-          <h1>ZRP Smart Traffic Management System</h1>
+          <h1>Smart Traffic</h1>
+          <p className="brand-subtitle">In support of ZRP</p>
         </div>
         {session && (
           <div className="session-info">

@@ -1,5 +1,46 @@
 import 'package:flutter/material.dart';
 
+const productName = 'Smart Traffic';
+const productEyebrow = 'TRAFFIC OPERATIONS';
+const productSubtitle = 'In support of ZRP';
+
+class ProductBrand extends StatelessWidget {
+  const ProductBrand({this.onNavy = true, this.compact = false, super.key});
+  final bool onNavy, compact;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(productEyebrow,
+              style: TextStyle(
+                  color: onNavy
+                      ? const Color(0xffb4dce5)
+                      : const Color(0xff536878),
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 11)),
+          const SizedBox(height: 8),
+          Text(productName,
+              style: TextStyle(
+                  color: onNavy ? Colors.white : const Color(0xff142d40),
+                  fontSize: compact ? 22 : 25,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2)),
+          const SizedBox(height: 5),
+          Text(productSubtitle,
+              style: TextStyle(
+                  color: onNavy
+                      ? const Color(0xffb6c8d3)
+                      : const Color(0xff536878),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  height: 1.5)),
+        ],
+      );
+}
+
 const defaultCurrency = 'USD';
 String formatCurrency(dynamic value, [String? currency]) {
   final amount = (num.tryParse('$value') ?? 0).toStringAsFixed(2);
