@@ -49,7 +49,7 @@ export function statusLabel(status: string, kind = 'offence') {
   if (kind === 'incident')
     return (
       (
-        { OPEN: 'Submitted', IN_PROGRESS: 'Under review' } as Record<
+        { OPEN: 'Submitted', IN_PROGRESS: 'Under Review' } as Record<
           string,
           string
         >

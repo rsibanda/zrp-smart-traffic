@@ -42,7 +42,7 @@ export function configure(app: INestApplication) {
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle('ZRP Smart Traffic Management System')
+      .setTitle('Smart Traffic — In support of ZRP')
       .setDescription(
         'Academic Prototype. Traffic management API; payments are simulated.',
       )

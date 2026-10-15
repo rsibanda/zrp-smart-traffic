@@ -76,7 +76,9 @@ it('uses linked records, retains a payment request key after connection loss, an
       onSessionExpired={() => {}}
     />,
   );
-  fireEvent.click(await screen.findByRole('button', { name: 'Pay Now' }));
+  const payNow = await screen.findByRole('button', { name: 'Pay Now' });
+  expect(screen.getByRole('button', { name: 'Paid Fines 0' })).toBeTruthy();
+  fireEvent.click(payNow);
   fireEvent.change(screen.getByLabelText('Payment method'), {
     target: { value: 'CARD' },
   });
@@ -109,6 +111,7 @@ it('uses linked records, retains a payment request key after connection loss, an
     expect(screen.queryByRole('button', { name: 'Pay Now' })).toBeNull(),
   );
   expect(screen.getByText('3 pts')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Paid Fines 1' })).toBeTruthy();
 });
 it('exports a receipt with an explicit simulation disclosure', () => {
   const text = receiptText({

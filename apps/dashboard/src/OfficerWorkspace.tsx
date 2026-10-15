@@ -61,7 +61,7 @@ const destinations = [
   },
   {
     title: 'My Activity',
-    mobile: 'Profile',
+    mobile: 'Activity',
     path: '/officer/activity',
     icon: 'profile',
   },
@@ -253,16 +253,6 @@ export function OfficerWorkspace({
             <span className="officer-mobile-label">{d.mobile}</span>
           </button>
         ))}
-        <button
-          className="officer-mobile-profile"
-          aria-current={
-            ['Profile', 'My Activity'].includes(tab) ? 'page' : undefined
-          }
-          onClick={() => navigate('Profile')}
-        >
-          <MotoristIcon name="profile" />
-          Profile
-        </button>
       </nav>
       {error && (
         <p className="error" role="alert">

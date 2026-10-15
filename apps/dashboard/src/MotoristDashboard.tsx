@@ -405,6 +405,13 @@ export function MotoristDashboard({
                         'My Infringements',
                       ],
                       [
+                        'Paid Fines',
+                        summary.paidFines,
+                        'payment',
+                        'paid',
+                        'Payments',
+                      ],
+                      [
                         'Registered Vehicles',
                         summary.registeredVehicles,
                         'vehicle',
