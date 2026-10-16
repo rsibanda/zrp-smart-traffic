@@ -236,10 +236,16 @@ export function OfficerWorkspace({
   };
   return (
     <div className="officer-workspace">
-      <nav className="officer-nav" aria-label="Officer services">
+      <nav
+        className="officer-nav mobile-bottom-nav"
+        aria-label="Officer services"
+      >
         {destinations.map((d) => (
           <button
             key={d.title}
+            className={
+              d.title === 'My Activity' ? 'officer-activity-link' : undefined
+            }
             aria-current={
               tab === d.title ||
               (d.title === 'My Activity' && tab === 'Profile')
@@ -253,6 +259,16 @@ export function OfficerWorkspace({
             <span className="officer-mobile-label">{d.mobile}</span>
           </button>
         ))}
+        <button
+          className="officer-mobile-profile"
+          aria-current={
+            ['Profile', 'My Activity'].includes(tab) ? 'page' : undefined
+          }
+          onClick={() => navigate('Profile')}
+        >
+          <MotoristIcon name="profile" />
+          <span>Profile</span>
+        </button>
       </nav>
       {error && (
         <p className="error" role="alert">

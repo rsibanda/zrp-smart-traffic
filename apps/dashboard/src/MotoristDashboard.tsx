@@ -290,7 +290,7 @@ export function MotoristDashboard({
   }
   return (
     <div className="motorist-workspace">
-      <nav className="motorist-nav" aria-label="Motorist services">
+      <nav className="motorist-nav mobile-bottom-nav" aria-label="Motorist services">
         {motoristPages.map((item) => (
           <button
             key={item.title}

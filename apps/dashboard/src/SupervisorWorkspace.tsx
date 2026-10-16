@@ -525,7 +525,7 @@ export function SupervisorWorkspace({
         </section>
       )}
       <nav
-        className="supervisor-bottom-nav"
+        className="supervisor-bottom-nav mobile-bottom-nav"
         aria-label="Mobile command centre navigation"
       >
         {(

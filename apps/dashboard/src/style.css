@@ -1274,52 +1274,12 @@ dialog::backdrop {
     padding: 0 10px;
     margin: 12px auto 0;
   }
-  .motorist-workspace {
-    padding-bottom: calc(76px + env(safe-area-inset-bottom));
-  }
-  .motorist-main ~ .app-footer {
-    padding-bottom: calc(90px + env(safe-area-inset-bottom));
-  }
   .motorist-workspace .desktop-label,
   .desktop-welcome-name {
     display: none;
   }
   .motorist-workspace .mobile-label {
     display: inline;
-  }
-  .motorist-nav {
-    position: fixed;
-    inset: auto 0 0;
-    z-index: 20;
-    display: flex;
-    gap: 0;
-    margin: 0;
-    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
-    border-radius: 12px 12px 0 0;
-    box-shadow: 0 -2px 12px #142d4008;
-  }
-  .motorist-nav button {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    border: 0;
-    border-radius: 8px;
-    padding: 7px 2px;
-    min-height: 56px;
-    min-width: 0;
-    font-size: 0.7rem;
-  }
-  .motorist-nav button[aria-current='page'] {
-    color: var(--navy);
-    background: #edf4f7;
-    box-shadow: none;
-    font-weight: 700;
-  }
-  .motorist-nav .motorist-icon {
-    display: block;
-    width: 23px;
-    height: 23px;
   }
   .motorist-workspace > section,
   .motorist-welcome {
@@ -1621,37 +1581,6 @@ dialog::backdrop {
   margin-top: 3px;
 }
 @media (max-width: 700px) {
-  .officer-workspace {
-    padding-bottom: calc(78px + env(safe-area-inset-bottom));
-  }
-  .officer-nav {
-    position: fixed;
-    inset: auto 0 0;
-    z-index: 20;
-    margin: 0;
-    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
-    gap: 0;
-    border-radius: 12px 12px 0 0;
-  }
-  .officer-nav button {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.65rem;
-    padding: 7px 2px;
-    border: 0;
-    min-height: 56px;
-    min-width: 0;
-  }
-  .officer-nav button[aria-current='page'] {
-    color: var(--navy);
-    background: #edf4f7;
-    font-weight: 700;
-  }
-  .officer-nav .motorist-icon {
-    display: block;
-  }
   .officer-mobile-label {
     display: inline;
   }
@@ -1946,44 +1875,8 @@ dialog::backdrop {
   }
 }
 @media (max-width: 700px) {
-  .supervisor-workspace {
-    padding-bottom: 88px;
-  }
   .supervisor-desktop-nav {
     display: none;
-  }
-  .supervisor-bottom-nav {
-    display: flex;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: white;
-    border-top: 1px solid #d7e2eb;
-    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
-    z-index: 20;
-    box-shadow: 0 -2px 10px #142f4308;
-  }
-  .supervisor-bottom-nav button {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    min-width: 0;
-    min-height: 52px;
-    background: transparent;
-    border: 0;
-    padding: 5px 1px;
-    color: #35556d;
-    font-size: 0.65rem;
-  }
-  .supervisor-bottom-nav button[aria-current='page'] {
-    color: #075a77;
-    background: #eaf4f6;
-    border-radius: 8px;
-    font-weight: 700;
   }
   .command-dashboard {
     gap: 12px;
@@ -2094,5 +1987,74 @@ dialog::backdrop {
   }
   .approval-details dd {
     margin-bottom: 10px;
+  }
+}
+
+/* Shared mobile bottom bar: Motorist dimensions and treatment for every role. */
+.officer-nav .officer-mobile-profile {
+  display: none;
+}
+@media (max-width: 700px) {
+  :root {
+    /* Icon (25), gap (5), button padding (14), bar padding/border (18), label. */
+    --mobile-nav-height: max(74px, calc(62px + 0.98rem));
+    --mobile-nav-clearance: calc(
+      var(--mobile-nav-height) + 16px + env(safe-area-inset-bottom, 0px)
+    );
+  }
+  .motorist-workspace,
+  .officer-workspace,
+  .supervisor-workspace,
+  .motorist-main ~ .app-footer {
+    padding-bottom: var(--mobile-nav-clearance);
+  }
+  .mobile-bottom-nav {
+    display: flex;
+    flex-wrap: nowrap;
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 20;
+    height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    gap: 0;
+    padding: 8px max(4px, env(safe-area-inset-right, 0px))
+      calc(8px + env(safe-area-inset-bottom, 0px))
+      max(4px, env(safe-area-inset-left, 0px));
+    border: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+    background: #fff;
+    box-shadow: 0 -2px 12px #142d4008;
+  }
+  .mobile-bottom-nav button {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    min-height: 56px;
+    padding: 7px 2px;
+    border: 0;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--navy);
+    font-size: 0.7rem;
+  }
+  .mobile-bottom-nav button[aria-current='page'] {
+    color: var(--navy);
+    background: #edf4f7;
+    box-shadow: none;
+    font-weight: 700;
+  }
+  .mobile-bottom-nav .motorist-icon {
+    display: block;
+    width: 23px;
+    height: 23px;
+  }
+  .officer-nav .officer-activity-link {
+    display: none;
+  }
+  .officer-nav .officer-mobile-profile {
+    display: flex;
   }
 }

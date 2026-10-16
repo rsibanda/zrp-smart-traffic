@@ -151,8 +151,8 @@ it('renders the dashboard from all result pages, preserves drafts across tabs an
   expect(
     (screen.getByLabelText('Vehicle registration') as HTMLInputElement).value,
   ).toBe('ABC1234');
-  window.history.replaceState({}, '', '/officer/profile');
-  fireEvent.popState(window);
+  fireEvent.click(within(nav).getByRole('button', { name: 'Profile' }));
+  expect(window.location.pathname).toBe('/officer/profile');
   expect(screen.getByRole('heading', { name: 'Officer Profile' })).toBeTruthy();
   fireEvent.click(within(nav).getByRole('button', { name: /^Incidents/ }));
   const incidentForm = screen
