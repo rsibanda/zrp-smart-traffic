@@ -4,6 +4,8 @@
 
 ## Current increment
 
+The 30 October increment adds secure ticket QR verification, private vehicle applications with supervisor decisions, configurable application fees and payment simulation, and a verified-driver remaining-points ledger. See [setup, workflows and security decisions](docs/ticket-applications-points.md) and [validation status](docs/remaining-work-2026-10-30.md). The interface notice is **Academic Prototype — No real payments or enforcement**. New hosted/device acceptance remains pending; these changes have not been published.
+
 The repository began with only `AGENTS.md`; its wording is preserved. The project uses the current folder as the repository root instead of nesting another `zrp-smart-traffic` directory.
 
 Implemented source: NestJS API with PostgreSQL/Prisma migration and fictional seed, Argon2id sign-in, revocable 30-minute sessions, exact fictional vehicle lookup, own draft creation, idempotent ticket submission, assigned supervisor review and transactional audit history. The React client signs in, lists permitted records with polling, opens tickets and submits reviews. Flutter source includes officer sign-in, lookup, draft preview, submission and recent activity.

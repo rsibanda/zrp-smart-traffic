@@ -512,7 +512,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
                             onNavigate: navigate),
                       const Padding(
                           padding: EdgeInsets.all(16),
-                          child: Text('Academic Prototype',
+                          child: Text(prototypeNotice,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                   fontSize: 11, color: Color(0xff536878)))),

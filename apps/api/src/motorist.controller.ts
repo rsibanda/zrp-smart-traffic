@@ -1,4 +1,5 @@
 import { CURRENCY } from './currency';
+import { DriverPointsService } from './driver-points';
 import {
   Body,
   Controller,
@@ -58,6 +59,7 @@ export class MotoristController {
   constructor(
     private readonly db: PrismaService,
     private readonly payments: PaymentsService,
+    private readonly points: DriverPointsService,
   ) {}
   @Get('dashboard')
   async dashboard(@Req() req: StaffRequest) {
@@ -83,6 +85,7 @@ export class MotoristController {
       ['PENDING', 'OVERDUE'].includes(t.paymentStatus),
     );
     return {
+      driverPoints: await this.points.balance(req.actor.id),
       totalPayable:
         payable.reduce(
           (sum, t) => sum + Math.round(Number(t.amount) * 100),

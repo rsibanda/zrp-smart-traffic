@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'presentation.dart';
 import 'role_workspace.dart';
+import 'vehicle_applications.dart';
 
 class VehicleWorkspace extends StatefulWidget {
   const VehicleWorkspace(
@@ -96,6 +97,7 @@ class _VehicleWorkspaceState extends State<VehicleWorkspace> {
   @override
   Widget build(BuildContext context) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        VehicleApplicationsButton(api: widget.api),
         const SizedBox(height: 16),
         Text('My Vehicles', style: Theme.of(context).textTheme.headlineSmall),
         const Text('Manage vehicles linked to your motorist account.'),
@@ -293,7 +295,7 @@ class _VehicleRegistrationState extends State<VehicleRegistration> {
                     child: const Text('Submit Link Request'))
             ],
             if (busy) const LinearProgressIndicator(),
-            const Text('Academic Prototype', textAlign: TextAlign.center),
+            const Text(prototypeNotice, textAlign: TextAlign.center),
           ])));
 }
 
@@ -467,6 +469,6 @@ class _VehicleDetailState extends State<VehicleDetail> {
                 Text(
                     '${readable(r['kind'])} request · ${readable(r['status'])} · ${r['submittedAt'].toString().substring(0, 10)}'),
             ],
-            const Text('Academic Prototype', textAlign: TextAlign.center),
+            const Text(prototypeNotice, textAlign: TextAlign.center),
           ])));
 }

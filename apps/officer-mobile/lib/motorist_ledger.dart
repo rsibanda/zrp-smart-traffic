@@ -1,4 +1,6 @@
 import 'vehicle_workspace.dart';
+import 'ticket_qr.dart';
+import 'driver_points.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -116,7 +118,7 @@ class _MotoristLedgerState extends State<MotoristLedger> {
     try {
       final data = await widget.api('/motorist/infringements/$reference');
       if (!mounted) return;
-      await showDialog<void>(
+      final shouldPay = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
                   title: Text(data['category']),
@@ -132,7 +134,7 @@ class _MotoristLedgerState extends State<MotoristLedger> {
                             'Officer: ${data['officer']} ${data['serviceNumber'] ?? ''}'),
                         Text('Due: ${ledgerDate(data['dueAt'])}'),
                         Text(
-                            '${ledgerMoney(data['amount'], data['currency'])} • ${data['demeritPoints']} points'),
+                            '${ledgerMoney(data['amount'], data['currency'])} • ${ticketPoints(Map<String, dynamic>.from(data))}'),
                         StatusBadge(data['paymentStatus']),
                         const SizedBox(height: 16),
                         const Text('Status timeline'),
@@ -157,10 +159,17 @@ class _MotoristLedgerState extends State<MotoristLedger> {
                                   : null),
                       ])),
                   actions: [
+                    if (['PENDING', 'OVERDUE'].contains(data['paymentStatus']))
+                      FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Pay Now (Simulation)')),
                     TextButton(
                         onPressed: () => Navigator.pop(context),
                         child: const Text('Back'))
                   ]));
+      if (shouldPay == true && mounted) {
+        await pay(ticket: Map<String, dynamic>.from(data));
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -247,7 +256,7 @@ class _MotoristLedgerState extends State<MotoristLedger> {
                     style: const TextStyle(
                         color: Color(0xff536878), fontSize: 12)),
                 const SizedBox(height: 6),
-                Text('${row['demeritPoints']} Demerit Points',
+                Text(ticketPoints(Map<String, dynamic>.from(row)),
                     style: const TextStyle(
                         color: Color(0xff945300),
                         fontSize: 13,
@@ -302,6 +311,26 @@ class _MotoristLedgerState extends State<MotoristLedger> {
   @override
   Widget build(BuildContext context) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (tab == 'Infringements')
+          PointsHistory(balance: summary?['driverPoints']),
+        if (tab == 'Infringements')
+          Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Scan Ticket QR'),
+                onPressed: () async {
+                  final reference = await Navigator.of(context).push<String>(
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              TicketScannerScreen(api: widget.api)));
+                  if (mounted && reference != null) await detail(reference);
+                },
+              )),
+        if (tab == 'Infringements' && widget.onNavigate != null)
+          TextButton(
+              onPressed: () => widget.onNavigate!('Traffic Notices & Reports'),
+              child: const Text('Use ticket reference & verification code')),
         if (tab == 'Dashboard')
           Card(
               margin: const EdgeInsets.only(bottom: 16),
@@ -338,8 +367,8 @@ class _MotoristLedgerState extends State<MotoristLedger> {
                                   const Color(0xffa65a00),
                                   'Infringements'),
                               metric(
-                                  'Demerit Points',
-                                  '${summary!['demeritPoints']} pts',
+                                  'Points Remaining',
+                                  remainingPoints(summary!['driverPoints']),
                                   Icons.shield_outlined,
                                   const Color(0xff142d40),
                                   'Infringements'),
@@ -628,7 +657,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             onPressed: busy ? null : () => Navigator.pop(context),
             child: const Text('Return to Dashboard')),
         const Center(
-            child: Text('Academic Prototype', style: TextStyle(fontSize: 11))),
+            child: Text(prototypeNotice, style: TextStyle(fontSize: 11))),
       ])));
 }
 

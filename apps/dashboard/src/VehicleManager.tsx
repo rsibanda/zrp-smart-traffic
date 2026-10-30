@@ -1,4 +1,5 @@
 import { VehicleApprovals } from './VehicleApprovals';
+import { VehicleApplications } from './VehicleApplications';
 import { useEffect, useRef, useState } from 'react';
 import type { Api } from './AdminPanel';
 import { Field } from './Field';
@@ -190,6 +191,7 @@ export function VehicleManager({
   const summary = inventory?.summary;
   return (
     <div className="vehicle-workspace">
+      {!registration && <VehicleApplications api={api} />}
       <section className="ledger-heading">
         <div className="card-title">
           <div>

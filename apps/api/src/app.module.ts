@@ -4,6 +4,14 @@ import {
   VehicleRequestsController,
 } from './vehicle-accounts';
 import { Module } from '@nestjs/common';
+import { DriverPointsController, DriverPointsService } from './driver-points';
+import { TicketQrController, TicketQrService } from './ticket-qr';
+import {
+  VehicleApplicationsController,
+  ApplicationDownloadController,
+} from './vehicle-applications.controller';
+import { VehicleApplicationsService } from './vehicle-applications.service';
+import { ApplicationFilesService } from './application-files';
 import { SupervisorController } from './supervisor.controller';
 import { MotoristController } from './motorist.controller';
 import { PaymentsService } from './payments.service';
@@ -25,6 +33,10 @@ import { EvidenceController } from './evidence.controller';
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 5 }])],
   controllers: [
+    DriverPointsController,
+    VehicleApplicationsController,
+    ApplicationDownloadController,
+    TicketQrController,
     SupervisorController,
     MotoristController,
     VehicleAccountsController,
@@ -39,6 +51,10 @@ import { EvidenceController } from './evidence.controller';
     EvidenceController,
   ],
   providers: [
+    DriverPointsService,
+    VehicleApplicationsService,
+    ApplicationFilesService,
+    TicketQrService,
     PrismaService,
     VehicleAccountsService,
     SessionGuard,

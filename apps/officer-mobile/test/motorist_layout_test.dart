@@ -26,6 +26,13 @@ void main() {
             'totalPayable': 180,
             'pendingFines': 1,
             'demeritPoints': 3,
+            'driverPoints': {
+              'status': 'VERIFIED',
+              'remaining': 9,
+              'allowance': 12,
+              'totalDeducted': 3,
+              'history': []
+            },
             'paidFines': 1,
             'registeredVehicles': 1
           };
@@ -107,7 +114,7 @@ void main() {
       expect(find.byType(NavigationDestination), findsNWidgets(5));
       expect(find.byType(ChoiceChip), findsNothing);
       expect(find.text('Welcome back'), findsOneWidget);
-      expect(find.text('3 pts'), findsOneWidget);
+      expect(find.text('9 / 12'), findsOneWidget);
       expect(find.text('opaque-secret'), findsNothing);
       expect(tester.takeException(), isNull);
       if (Platform.environment['CAPTURE_MOTORIST_UI'] == 'true' &&

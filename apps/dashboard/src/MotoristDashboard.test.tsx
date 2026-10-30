@@ -36,6 +36,13 @@ it('uses linked records, retains a payment request key after connection loss, an
         totalPayable: paid ? 0 : 80,
         pendingFines: paid ? 0 : 1,
         demeritPoints: 3,
+        driverPoints: {
+          status: 'VERIFIED',
+          remaining: 9,
+          allowance: 12,
+          totalDeducted: 3,
+          history: [],
+        },
         paidFines: paid ? 1 : 0,
         registeredVehicles: 1,
       };
@@ -110,7 +117,7 @@ it('uses linked records, retains a payment request key after connection loss, an
   await waitFor(() =>
     expect(screen.queryByRole('button', { name: 'Pay Now' })).toBeNull(),
   );
-  expect(screen.getByText('3 pts')).toBeTruthy();
+  expect(screen.getByText('9 / 12')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Paid Fines 1' })).toBeTruthy();
 });
 it('exports a receipt with an explicit simulation disclosure', () => {
@@ -258,7 +265,7 @@ it('uses five destinations, restores direct routes, and keeps reports under Prof
   expect(within(nav).queryByRole('button', { name: 'My Reports' })).toBeNull();
   window.history.replaceState({}, '', '/motorist/dashboard');
   fireEvent.popState(window);
-  await screen.findByText('4 pts');
+  await screen.findByText('Identity pending');
   expect(
     within(nav)
       .getByRole('button', { name: 'Dashboard' })

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { VehicleApplications } from './VehicleApplications';
 import type { Api } from './AdminPanel';
 import { Field } from './Field';
 import { readable, StatusBadge } from './presentation';
@@ -119,6 +120,9 @@ export function VehicleApprovals({
   }
   return (
     <section className="vehicle-approvals">
+      {base.startsWith('/supervisor') && (
+        <VehicleApplications api={api} staff />
+      )}
       <div className="section-heading">
         <h2>Pending Vehicle Approvals</h2>
         <span className="muted">Requests and decisions</span>

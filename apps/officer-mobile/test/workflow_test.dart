@@ -74,6 +74,13 @@ void main() {
           'demoFineAmountSnapshot': '25.00',
           'status': 'ISSUED'
         };
+      } else if (path.endsWith('/qr')) {
+        return http.Response(
+            jsonEncode({
+              'message':
+                  'QR configuration unavailable. Use manual verification.'
+            }),
+            503);
       } else if (path.endsWith('/incidents') && request.method == 'POST') {
         expect(jsonDecode(request.body)['type'], 'ACCIDENT');
         incidentCreated = true;

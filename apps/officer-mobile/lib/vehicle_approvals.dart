@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'presentation.dart';
 import 'role_workspace.dart';
+import 'vehicle_applications.dart';
 
 class VehicleApprovals extends StatefulWidget {
   const VehicleApprovals({required this.api, this.onChanged, super.key});
@@ -84,6 +85,7 @@ class _VehicleApprovalsState extends State<VehicleApprovals> {
   @override
   Widget build(BuildContext context) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        VehicleApplicationsButton(api: widget.api, staff: true),
         const Text('Pending Vehicle Approvals',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),

@@ -1,5 +1,11 @@
 # GitHub + Netlify deployment
 
+## Pending source increment — 30 October 2026
+
+The new QR/application/driver-points source changes are **not deployed**. Earlier live verification below applies to the previously published version. Deployment preparation and hardware acceptance are documented in [ticket applications and points](docs/ticket-applications-points.md).
+
+Before deploying this increment, validate the four `20261030...` migrations on an isolated database copy and preserve existing records. Deploy the API with `PUBLIC_SITE_URL=https://thunderous-moxie-b0872a.netlify.app`, retain the existing private S3 settings and allowed frontend origin, then publish the matching web build. Do not reset or reseed hosted data. Optional limits: `TICKET_QR_EXPIRY_DAYS=30`, `APPLICATION_FILE_LIMIT_MB=10`, `APPLICATION_ATTACHMENT_LIMIT=5`. Build Android against `https://zrp-traffic-api.onrender.com/api/v1` for hosted testing; the local debug APK targets emulator host `10.0.2.2` instead.
+
 Status: free Render backend and Netlify frontend deployed. Hosted API workflows for all four roles passed. Browser-driven acceptance remains unverified.
 Destination team: https://app.netlify.com/teams/rsibanda
 Repository: https://github.com/rsibanda/zrp-smart-traffic

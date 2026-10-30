@@ -242,6 +242,19 @@ export class VehicleAccountsService {
         select: requestFields,
       });
       if (existing) return existing;
+      const application = await tx.vehicleLinkRequest.findFirst({
+        where: {
+          motoristId: actor,
+          registration,
+          kind: 'APPLICATION',
+          status: { in: ['DRAFT', 'PENDING_REVIEW', 'CHANGES_REQUESTED'] },
+        },
+        select: { id: true },
+      });
+      if (application)
+        throw new ConflictException(
+          'Continue the existing vehicle application before creating another request.',
+        );
       const own = await tx.vehicle.findFirst({
         where: { registrationNumber: registration, motoristId: actor },
       });
@@ -313,7 +326,10 @@ export class VehicleAccountsService {
     });
   }
   async requests(actor: string | null, q: PageQuery) {
-    const where = actor ? { motoristId: actor } : {};
+    const where: Prisma.VehicleLinkRequestWhereInput = {
+      kind: { not: 'APPLICATION' },
+      ...(actor ? { motoristId: actor } : {}),
+    };
     const [items, total] = await this.db.$transaction([
       this.db.vehicleLinkRequest.findMany({
         where,
@@ -369,7 +385,10 @@ export class VehicleAccountsService {
           reviewNote: true,
         },
       });
-      if (!request) throw new NotFoundException('Request not found');
+      if (!request || request.kind === 'APPLICATION')
+        throw new NotFoundException(
+          'Request not found. Review applications in Vehicle applications.',
+        );
       const vehicle = await tx.vehicle.findUnique({
         where: { registrationNumber: request.registration },
         select: { ...vehicleFields, motoristId: true },
@@ -415,6 +434,10 @@ export class VehicleAccountsService {
         include: { motorist: { select: { role: true, active: true } } },
       });
       if (!request) throw new NotFoundException('Request not found');
+      if (request.kind === 'APPLICATION')
+        throw new ConflictException(
+          'Review this application in Vehicle applications, including its supporting documents.',
+        );
       if (request.status !== 'PENDING') {
         if (request.status !== dto.status)
           throw new ConflictException('Request has already been reviewed.');

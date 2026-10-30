@@ -71,6 +71,13 @@ export class OffenceQuery extends PageQuery {
   status?: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'CONFIRMED' | 'CANCELLED';
 }
 export class CreateOffenceDto {
+  @ApiPropertyOptional({
+    description:
+      'Explicitly identified responsible driver, verified to an account by administration. Omit when responsibility is unverified.',
+  })
+  @IsOptional()
+  @IsUUID()
+  responsibleDriverId?: string;
   @ApiProperty({
     description: 'Client UUID reused for every retry of this draft',
   })
@@ -111,7 +118,11 @@ export class ReviewDto {
   @ApiProperty() @IsString() @Length(3, 1000) @Matches(/\S/) notes!: string;
 }
 export class UpdateOffenceDto extends PartialType(
-  OmitType(CreateOffenceDto, ['requestKey', 'vehicleId'] as const),
+  OmitType(CreateOffenceDto, [
+    'requestKey',
+    'vehicleId',
+    'responsibleDriverId',
+  ] as const),
 ) {
   @ApiProperty({
     description: 'Current draft revision; stale edits return 409',

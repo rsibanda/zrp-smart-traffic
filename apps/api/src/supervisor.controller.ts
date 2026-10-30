@@ -51,7 +51,9 @@ export class SupervisorController {
         },
         _sum: { amount: true },
       }),
-      this.db.vehicleLinkRequest.count({ where: { status: 'PENDING' } }),
+      this.db.vehicleLinkRequest.count({
+        where: { status: { in: ['PENDING', 'PENDING_REVIEW'] } },
+      }),
     ]);
     return {
       paymentsToday: Number(payments._sum.amount ?? 0),

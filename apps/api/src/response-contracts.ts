@@ -65,6 +65,8 @@ const motoristTicket = object({
   status: text,
   paymentStatus: text,
   demeritPoints: count,
+  driverIdentification: text,
+  pointsDeducted: count,
   issuedAt: date,
   dueAt: optional(date),
   category: text,
@@ -241,6 +243,36 @@ const security = object({
 
 // Explicit safe response contracts are independent from Prisma's sensitive persistence fields.
 const contracts: Record<string, SchemaObject> = {
+  'get /drivers/verified': object({
+    id: uuid,
+    fullName: text,
+    licenceStatus: text,
+  }),
+  'get /admin/driver-points/policy': object({
+    key: text,
+    allowance: count,
+    version: count,
+  }),
+  'post /admin/driver-points/policy': object({
+    key: text,
+    allowance: count,
+    version: count,
+  }),
+  'post /admin/driver-identities/verify': object({
+    name: text,
+    motorist: text,
+    status: text,
+  }),
+  'get /public/ticket-qr/config': object({ origin: optional(text) }),
+  'post /public/ticket-qr/status': object({ status: text }),
+  'post /motorist/ticket-qr/verify': motoristTicket,
+  'post /tickets/{id}/qr': object({
+    displayReference: text,
+    verificationUrl: text,
+    qrImage: text,
+    expiresAt: date,
+  }),
+  'post /tickets/{id}/qr/revoke': object({ status: text }),
   'post /auth/login': object({ token: text, expiresAt: date, user }),
   'get /auth/me': user,
   'get /vehicles': object({ items: array(vehicle) }),
@@ -486,6 +518,121 @@ export function addResponseContracts(document: OpenAPIObject) {
       }),
     ),
   });
+  const vehicleCategory = object({
+    id: uuid,
+    code: text,
+    label: text,
+    feeMinor: count,
+    currency: text,
+    active: flag,
+    updatedAt: date,
+  });
+  const applicationFile = object({
+    id: uuid,
+    kind: text,
+    mimeType: text,
+    byteSize: count,
+    createdAt: date,
+  });
+  const applicationPayment = object({
+    id: uuid,
+    applicationId: uuid,
+    requestKey: uuid,
+    reference: text,
+    receiptReference: optional(text),
+    method: text,
+    status: text,
+    feeMinor: count,
+    currency: text,
+    createdAt: date,
+    paidAt: optional(date),
+  });
+  const application = object({
+    requestId: uuid,
+    categoryId: uuid,
+    registration: text,
+    make: text,
+    model: text,
+    year: count,
+    colour: text,
+    chassis: text,
+    engine: text,
+    relationship: text,
+    declaration: flag,
+    feeMinor: count,
+    currency: text,
+    revision: count,
+    status: text,
+    createdAt: date,
+    updatedAt: date,
+    submittedAt: date,
+    reviewedAt: optional(date),
+    reviewNote: optional(text),
+    category: vehicleCategory,
+    applicant: optional(object({ name: text, email: text })),
+    linkedToAnotherMotorist: optional(flag),
+    files: array(applicationFile),
+    payments: array(applicationPayment),
+    decisions: array(
+      object({
+        status: text,
+        reason: text,
+        createdAt: date,
+        reviewer: object({ name: text }),
+      }),
+    ),
+    notice: text,
+  });
+  Object.assign(contracts, {
+    'get /vehicle-categories': array(vehicleCategory),
+    'post /admin/vehicle-categories': vehicleCategory,
+    'patch /admin/vehicle-categories/{id}': vehicleCategory,
+    'get /motorist/vehicle-applications/limits': object({
+      maxFileBytes: count,
+      maxAttachments: count,
+      supportedTypes: array(text),
+    }),
+    'get /motorist/vehicle-applications': page(application),
+    'get /supervisor/vehicle-applications': page(application),
+    'get /motorist/vehicle-applications/{id}': application,
+    'get /supervisor/vehicle-applications/{id}': application,
+    'post /motorist/vehicle-applications': application,
+    'patch /motorist/vehicle-applications/{id}': application,
+    'post /motorist/vehicle-applications/{id}/submit': application,
+    'post /supervisor/vehicle-applications/{id}/review': application,
+    'post /motorist/vehicle-applications/{id}/files/{kind}': applicationFile,
+    'post /motorist/vehicle-application-files/{id}/remove': object({
+      removed: flag,
+    }),
+    'post /vehicle-application-files/{id}/download': object({
+      url: text,
+      expiresAt: date,
+      mimeType: text,
+    }),
+    'post /motorist/vehicle-applications/{id}/payments': applicationPayment,
+    'post /motorist/application-payments/{reference}/outcome':
+      applicationPayment,
+  });
+  const pointsBalance = object({
+    status: text,
+    remaining: optional(count),
+    allowance: optional(count),
+    totalDeducted: count,
+    history: array(
+      object({
+        event: text,
+        delta: { type: 'integer' },
+        reference: text,
+        at: date,
+        reason: text,
+      }),
+    ),
+  });
+  contracts['get /motorist/driver-points'] = pointsBalance;
+  contracts['get /motorist/dashboard'] = object({
+    ...contracts['get /motorist/dashboard'].properties,
+    driverPoints: pointsBalance,
+  });
   for (const [path, operations] of Object.entries(document.paths)) {
     for (const method of ['get', 'post', 'patch'] as const) {
       const operation = operations[method];
@@ -500,7 +647,12 @@ export function addResponseContracts(document: OpenAPIObject) {
           '$ref' in response
         )
           continue;
-        if (route === '/evidence/{id}')
+        if (route === '/vehicle-application-files/{id}/content')
+          response.content = {
+            'application/pdf': { schema: { type: 'string', format: 'binary' } },
+            'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+          };
+        else if (route === '/evidence/{id}')
           response.content = {
             'image/jpeg': { schema: { type: 'string', format: 'binary' } },
           };

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 const productName = 'Smart Traffic';
 const productEyebrow = 'TRAFFIC OPERATIONS';
 const productSubtitle = 'In support of ZRP';
+const prototypeNotice = 'Academic Prototype — No real payments or enforcement';
 
 class ProductBrand extends StatelessWidget {
   const ProductBrand({this.onNavy = true, this.compact = false, super.key});

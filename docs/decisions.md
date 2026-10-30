@@ -78,3 +78,9 @@ Refactor the existing officer clients around Traffic officer.png, retaining the 
 ## 2026-10-09 ? Supervisor reference layout and vehicle approval authority
 
 The latest user brief explicitly supersedes the 5 October ADMIN-only request-review decision: add dedicated SUPERVISOR vehicle approval routes while preserving administrative route guards. Reuse the existing serializable ownership transaction and VERIFIED enum, add safe audited detail reads and require a separate confirmation in both staff clients. Command-centre payments follow assigned offences and use Harare calendar-day totals. Do not invent missing incident/team or checkpoint-count data or unsupported offence transitions. See [supervisor reference layout](supervisor-reference-layout.md).
+
+## 2026-10-30 - Ticket QR, vehicle applications and responsible-driver points
+
+Implement the supplied remaining-work brief within the existing repository. Extend vehicle requests, private storage and payment simulation; retain offence configuration and navigation. QR tokens are hashed, revocable and passed in URL fragments. They grant no account entitlement. Document-backed applications preserve submitted fee snapshots and require supervisor decisions; approval cannot replace another motorist's ownership.
+
+Points attach to an explicitly verified responsible driver. Reuse atomic submission: ticket ISSUED and offence SUBMITTED. Debit once on issuance, credit once on cancellation, and leave payment independent. Historical tickets remain LEGACY_NOT_ASSESSED without a retrospective debit. Defaults are academic configuration, not law. See ticket-applications-points.md for details, retention policy and deployment prerequisites.

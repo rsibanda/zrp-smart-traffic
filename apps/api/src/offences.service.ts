@@ -16,6 +16,7 @@ import {
 import { PrismaService } from './prisma.service';
 import { assignedSupervisor } from './operations.controller';
 import { effectivePaymentStatus } from './payments.service';
+import { issuePoints, reversePoints } from './driver-points';
 
 export function scope(actor: Actor): Prisma.OffenceWhereInput {
   if (actor.role === 'OFFICER') return { officerId: actor.id };
@@ -89,6 +90,7 @@ export class OffencesService {
           existing.officerId !== actor.id ||
           existing.vehicleId !== dto.vehicleId ||
           existing.categoryId !== dto.categoryId ||
+          existing.responsibleDriverId !== (dto.responsibleDriverId ?? null) ||
           existing.notes !== dto.notes ||
           existing.location !== dto.location ||
           existing.observedAt.getTime() !==
@@ -111,9 +113,24 @@ export class OffencesService {
       if (!vehicle || !category)
         throw new BadRequestException('Unknown vehicle or inactive category');
       const supervisorId = await assignedSupervisor(tx, actor.id);
+      if (
+        dto.responsibleDriverId &&
+        !(await tx.driver.findFirst({
+          where: {
+            id: dto.responsibleDriverId,
+            identityVerifiedAt: { not: null },
+            motorist: { active: true, role: 'USER' },
+            pointsAccount: { isNot: null },
+          },
+        }))
+      )
+        throw new BadRequestException(
+          'The responsible driver must have a verified account identity. Leave identification pending if unknown.',
+        );
       const offence = await tx.offence.create({
         data: {
           ...dto,
+          driverConfirmedAt: dto.responsibleDriverId ? new Date() : null,
           observedAt: new Date(dto.observedAt),
           officerId: actor.id,
           supervisorId,
@@ -263,19 +280,28 @@ export class OffencesService {
         throw new ConflictException(
           'Choose an active offence category before submitting',
         );
+      const responsible = offence.responsibleDriverId
+        ? await tx.driver.findUnique({
+            where: { id: offence.responsibleDriverId },
+          })
+        : null;
       const ticket = await tx.ticket.create({
         data: {
           offenceId: id,
           publicReference: randomBytes(24).toString('hex'),
           demoFineAmountSnapshot: offence.category.demoFineAmount,
-          motoristId: offence.vehicle.motoristId,
+          motoristId: responsible?.motoristId ?? offence.vehicle.motoristId,
           demeritPointsSnapshot: offence.category.demeritPoints,
+          pointsAssessment: offence.responsibleDriverId
+            ? 'ASSESSED'
+            : 'PENDING_DRIVER_IDENTIFICATION',
           dueAt: new Date(
             Date.now() + offence.category.paymentDueDays * 86400000,
           ),
         },
       });
       await tx.offence.update({ where: { id }, data: { status: 'SUBMITTED' } });
+      await issuePoints(tx, ticket, offence.responsibleDriverId, actor.id);
       await tx.auditEvent.create({
         data: {
           actorId: actor.id,
@@ -290,6 +316,10 @@ export class OffencesService {
 
   async update(actor: Actor, id: string, dto: UpdateOffenceDto) {
     const { revision, ...changes } = dto;
+    if ('responsibleDriverId' in changes)
+      throw new BadRequestException(
+        'Responsible driver is fixed for this draft. Discard it and create a corrected draft.',
+      );
     if (!Object.keys(changes).length)
       throw new BadRequestException('Provide a draft change');
     if (
@@ -392,11 +422,13 @@ export class OffencesService {
         },
         include: details,
       });
-      if (dto.status === 'CANCELLED')
+      if (dto.status === 'CANCELLED') {
         await tx.ticket.update({
           where: { offenceId: id },
           data: { status: 'CANCELLED' },
         });
+        if (result.ticket) await reversePoints(tx, result.ticket.id, actor.id);
+      }
       await tx.auditEvent.create({
         data: {
           actorId: actor.id,

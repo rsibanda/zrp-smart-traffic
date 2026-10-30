@@ -1,4 +1,6 @@
 import { VehicleRequestReview } from './VehicleManager';
+import { VehicleCategorySettings } from './VehicleApplications';
+import { DriverIdentitySettings } from './DriverPoints';
 import { formatCurrency } from './presentation';
 import { Field } from './Field';
 import { roleLabel, auditLabel, StatusBadge } from './presentation';
@@ -136,6 +138,8 @@ export function AdminPanel({ api }: { api: Api }) {
   return (
     <div aria-busy={busy}>
       <h2>System administration</h2>
+      <VehicleCategorySettings api={api} />
+      <DriverIdentitySettings api={api} />
       {error && (
         <p role="alert" className="error">
           {error}

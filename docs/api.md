@@ -2,6 +2,8 @@
 
 Base: `/api/v1`. Interactive route and request DTO documentation: `/api/docs` (JSON: `/api/docs-json`). DTO fields reject unknown properties. Explicit safe success and error response schemas are included in Swagger.
 
+The 30 October additions (ticket QR, private vehicle applications, catalogue fees and verified-driver points) are documented in [ticket applications and points](ticket-applications-points.md#api-additions). Existing routes remain compatible; `responsibleDriverId` is optional on draft creation and cannot be reassigned by the draft-update endpoint.
+
 Use `Authorization: Bearer <token>` from login. Sessions expire after 30 minutes; login again. Logout revokes the session. Expired/inactive sessions return 401. Disallowed roles return 403; inaccessible object IDs return 404.
 
 | Route                              | Role                              | Behaviour                                                                            |

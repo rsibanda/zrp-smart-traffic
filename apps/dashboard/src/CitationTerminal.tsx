@@ -3,6 +3,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Field } from './Field';
 import { EvidencePanel } from './EvidencePanel';
 import { AccountApi } from './MotoristDashboard';
+import { IssuedTicketQr } from './TicketQr';
+import { DriverIdentification } from './DriverPoints';
 type Category = {
   id: string;
   name: string;
@@ -29,6 +31,7 @@ export function CitationTerminal({
   onIssued?: () => void;
 }) {
   const formId = useId();
+  const [responsibleDriver, setResponsibleDriver] = useState('');
   const [categories, setCategories] = useState<Category[]>([]),
     [category, setCategory] = useState('');
   const [vehicle, setVehicle] = useState<Vehicle | null>(null),
@@ -142,6 +145,13 @@ export function CitationTerminal({
                     : 'Account not linked. Provide a ticket verification code after issue.'}
                 </p>
               </div>
+              {!draft && !ticket && (
+                <DriverIdentification
+                  key={vehicle.id}
+                  api={api}
+                  onChange={setResponsibleDriver}
+                />
+              )}
               {!ticket && (
                 <form
                   id={formId}
@@ -153,6 +163,9 @@ export function CitationTerminal({
                         requestKey: crypto.randomUUID(),
                         vehicleId: vehicle.id,
                         categoryId: category,
+                        ...(responsibleDriver
+                          ? { responsibleDriverId: responsibleDriver }
+                          : {}),
                         location: data.get('location'),
                         notes: data.get('notes'),
                         observedAt: new Date().toISOString(),
@@ -267,6 +280,7 @@ export function CitationTerminal({
           <h3>Infringement issued</h3>
           <p className="reference">{ticketLabel(ticket)}</p>
           <p>Amount: {formatCurrency(ticket.demoFineAmountSnapshot)}</p>
+          <IssuedTicketQr key={ticket.id} api={api} ticketId={ticket.id} />
           <button
             disabled={busy}
             onClick={() =>

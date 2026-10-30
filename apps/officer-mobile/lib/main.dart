@@ -1,4 +1,6 @@
 import 'officer_shell.dart';
+import 'ticket_qr.dart';
+import 'driver_points.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'presentation.dart';
@@ -72,6 +74,7 @@ class _OfficerScreenState extends State<OfficerScreen> {
   String accountId = '';
   String incidentType = 'ACCIDENT';
   String? motoristCode;
+  String? responsibleDriverId;
   Map<String, dynamic>? pendingIncident;
   List<dynamic> incidents = [];
   String? token, identity, categoryId, draftId;
@@ -113,14 +116,27 @@ class _OfficerScreenState extends State<OfficerScreen> {
     };
     late http.Response response;
     try {
-      response = await (body == null
-              ? client.get(Uri.parse('$baseUrl$path'), headers: headers)
-              : method == 'PATCH'
-                  ? client.patch(Uri.parse('$baseUrl$path'),
-                      headers: headers, body: jsonEncode(body))
-                  : client.post(Uri.parse('$baseUrl$path'),
-                      headers: headers, body: jsonEncode(body)))
-          .timeout(const Duration(seconds: 12));
+      if (method == 'MULTIPART' && body != null) {
+        final upload =
+            http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
+        upload.headers
+            .addAll({if (token != null) 'Authorization': 'Bearer $token'});
+        upload.files.add(http.MultipartFile.fromBytes(
+            'file', body['fileBytes'] as List<int>,
+            filename: body['fileName'] as String,
+            contentType: MediaType.parse(body['mimeType'] as String)));
+        response = await http.Response.fromStream(await client.send(upload))
+            .timeout(const Duration(seconds: 60));
+      } else {
+        response = await (body == null
+                ? client.get(Uri.parse('$baseUrl$path'), headers: headers)
+                : method == 'PATCH'
+                    ? client.patch(Uri.parse('$baseUrl$path'),
+                        headers: headers, body: jsonEncode(body))
+                    : client.post(Uri.parse('$baseUrl$path'),
+                        headers: headers, body: jsonEncode(body)))
+            .timeout(const Duration(seconds: 12));
+      }
     } on TimeoutException {
       throw Exception(
           'Request timed out. Submission may have reached the server. Retry the same draft.');
@@ -226,6 +242,7 @@ class _OfficerScreenState extends State<OfficerScreen> {
   }
 
   Future<void> lookup() async {
+    responsibleDriverId = null;
     motoristCode = null;
     coordinates = null;
     vehicle = null;
@@ -251,6 +268,8 @@ class _OfficerScreenState extends State<OfficerScreen> {
         'requestKey': const Uuid().v4(),
         'vehicleId': vehicle!['id'],
         'categoryId': categoryId,
+        if (responsibleDriverId != null)
+          'responsibleDriverId': responsibleDriverId,
         'location': location.text.trim(),
         'notes': notes.text.trim(),
         'observedAt': DateTime.now().toUtc().toIso8601String(),
@@ -505,6 +524,11 @@ class _OfficerScreenState extends State<OfficerScreen> {
             Text(
                 '${vehicle!['driver']['fullName']} · ${readable(vehicle!['driver']['licenceStatus'])}'),
           if (ticket == null) ...[
+            if (pendingDraft == null)
+              DriverIdentification(
+                  key: ValueKey(vehicle!['id']),
+                  api: api,
+                  onChanged: (id) => responsibleDriverId = id),
             const Text('Issue Traffic Infringement',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
             Text(vehicle!['motoristId'] != null
@@ -614,6 +638,8 @@ class _OfficerScreenState extends State<OfficerScreen> {
           const Text('Traffic ticket',
               style: TextStyle(fontWeight: FontWeight.bold)),
           SelectableText('Reference: ${ticketLabel(ticket!)}'),
+          IssuedTicketQr(
+              key: ValueKey(ticket!['id']), api: api, ticketId: ticket!['id']),
           action('Generate motorist verification code', () async {
             final result =
                 await api('/tickets/${ticket!['id']}/access-code', {});
@@ -768,7 +794,7 @@ class _OfficerScreenState extends State<OfficerScreen> {
               bottomNavigationBar: const SafeArea(
                   child: Padding(
                 padding: EdgeInsets.all(8),
-                child: Text('Academic Prototype',
+                child: Text(prototypeNotice,
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 11, color: Color(0xff536474))),
               )),

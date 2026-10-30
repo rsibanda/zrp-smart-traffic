@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
 import { resolve } from 'path';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -29,14 +30,18 @@ export class EvidenceStorage implements OnModuleDestroy {
       })
     : undefined;
 
-  async put(key: string, bytes: Buffer): Promise<string> {
+  async put(
+    key: string,
+    bytes: Buffer,
+    mimeType = 'image/jpeg',
+  ): Promise<string> {
     if (this.client) {
       await this.client.send(
         new PutObjectCommand({
           Bucket: this.bucket,
           Key: key,
           Body: bytes,
-          ContentType: 'image/jpeg',
+          ContentType: mimeType,
           CacheControl: 'no-store',
         }),
       );
@@ -47,13 +52,28 @@ export class EvidenceStorage implements OnModuleDestroy {
     return key;
   }
 
-  async get(key: string): Promise<Buffer> {
+  async signedDownload(key: string, mimeType: string): Promise<string | null> {
+    if (!key.startsWith('s3:') || !this.client) return null;
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key.slice(3),
+        ResponseContentType: mimeType,
+        ResponseContentDisposition: 'attachment',
+        ResponseCacheControl: 'no-store',
+      }),
+      { expiresIn: 120 },
+    );
+  }
+
+  async get(key: string, maxBytes = 5 * 1024 * 1024): Promise<Buffer> {
     if (key.startsWith('s3:')) {
       if (!this.client) throw new Error('Remote evidence storage unavailable');
       const result = await this.client.send(
         new GetObjectCommand({ Bucket: this.bucket, Key: key.slice(3) }),
       );
-      if (!result.Body || (result.ContentLength ?? 0) > 5 * 1024 * 1024)
+      if (!result.Body || (result.ContentLength ?? 0) > maxBytes)
         throw new Error('Invalid evidence object');
       return Buffer.from(await result.Body.transformToByteArray());
     }

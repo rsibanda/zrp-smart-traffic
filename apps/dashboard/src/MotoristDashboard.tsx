@@ -1,5 +1,7 @@
 import { MotoristIcon, type MotoristIconName } from './MotoristIcon';
 import { VehicleManager } from './VehicleManager';
+import { TicketScanner } from './TicketQr';
+import { DriverBalance, PointsHistory } from './DriverPoints';
 import { useEffect, useRef, useState } from 'react';
 import { PublicPortal } from './PublicPortal';
 import { Field } from './Field';
@@ -14,6 +16,8 @@ import {
 export type { Api as AccountApi } from './AdminPanel';
 import type { Api as AccountApi } from './AdminPanel';
 type Ticket = {
+  driverIdentification?: string;
+  pointsDeducted?: number;
   displayReference?: string;
   currency?: string;
   receiptPaymentReference?: string | null;
@@ -55,6 +59,7 @@ type Receipt = Payment & {
   notice: string;
 };
 type Summary = {
+  driverPoints?: DriverBalance;
   currency?: string;
   totalPayable: number;
   pendingFines: number;
@@ -128,11 +133,15 @@ export function receiptText(r: Receipt) {
   ].join('\n');
 }
 export function MotoristDashboard({
+  initialQrToken,
+  onQrConsumed,
   api,
   accountToken,
   user,
   onSessionExpired,
 }: {
+  initialQrToken?: string;
+  onQrConsumed?: () => void;
   api: AccountApi;
   accountToken: string;
   user: { name: string };
@@ -290,7 +299,10 @@ export function MotoristDashboard({
   }
   return (
     <div className="motorist-workspace">
-      <nav className="motorist-nav mobile-bottom-nav" aria-label="Motorist services">
+      <nav
+        className="motorist-nav mobile-bottom-nav"
+        aria-label="Motorist services"
+      >
         {motoristPages.map((item) => (
           <button
             key={item.title}
@@ -398,8 +410,10 @@ export function MotoristDashboard({
                         'My Infringements',
                       ],
                       [
-                        'Demerit Points',
-                        summary.demeritPoints + ' pts',
+                        'Points Remaining',
+                        summary.driverPoints?.status === 'VERIFIED'
+                          ? `${summary.driverPoints.remaining} / ${summary.driverPoints.allowance}`
+                          : 'Identity pending',
                         'shield',
                         'points',
                         'My Infringements',
@@ -434,6 +448,30 @@ export function MotoristDashboard({
                 </div>
               ))}
           </section>
+          {(tab === 'My Infringements' || initialQrToken) && (
+            <PointsHistory balance={summary?.driverPoints} />
+          )}
+          {(tab === 'My Infringements' || initialQrToken) && (
+            <TicketScanner
+              api={api}
+              initialToken={initialQrToken}
+              onConsumed={onQrConsumed}
+              onVerified={(reference) => {
+                navigate('My Infringements');
+                void api(`/motorist/infringements/${reference}`)
+                  .then(setSelected)
+                  .catch((e) => setError(e.message));
+              }}
+            />
+          )}
+          {tab === 'My Infringements' && (
+            <button
+              className="secondary"
+              onClick={() => navigate('Traffic Notices & Reports')}
+            >
+              Use ticket reference & verification code
+            </button>
+          )}
           {['Dashboard', 'My Infringements'].includes(tab) && (
             <section>
               <div className="section-heading">
@@ -511,7 +549,11 @@ export function MotoristDashboard({
                         </p>
                         <p className="record-location">{t.location}</p>
                         <p className="record-points">
-                          {t.demeritPoints} Demerit Points
+                          {t.driverIdentification === 'ASSESSED'
+                            ? `${t.pointsDeducted ?? 0} points deducted`
+                            : t.driverIdentification === 'LEGACY_NOT_ASSESSED'
+                              ? 'Historical points not reassessed'
+                              : 'Pending driver identification'}
                         </p>
                         <div className="record-footer">
                           <div>
@@ -686,6 +728,19 @@ export function MotoristDashboard({
                 <dd>{selected.demeritPoints}</dd>
               </dl>
               <h3>Status timeline</h3>
+              <PointsHistory balance={summary?.driverPoints} />
+              <p>
+                {selected.driverIdentification === 'ASSESSED'
+                  ? `${selected.pointsDeducted ?? 0} points deducted`
+                  : selected.driverIdentification === 'LEGACY_NOT_ASSESSED'
+                    ? 'Historical points not reassessed'
+                    : 'Pending driver identification — no points deducted.'}
+              </p>
+              {['PENDING', 'OVERDUE'].includes(selected.paymentStatus) && (
+                <button onClick={() => setPaying(selected)}>
+                  Pay Now (Simulation)
+                </button>
+              )}
               {selected.timeline.map((s, i) => (
                 <p key={i}>
                   <StatusBadge value={s.status} /> {date(s.at)}

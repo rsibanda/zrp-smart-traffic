@@ -12,6 +12,7 @@ import { serial } from './transactions';
 export const reference = (prefix: string) =>
   `${prefix}-${randomBytes(12).toString('hex')}`;
 export const ticketInclude = {
+  pointsEntries: { select: { event: true, delta: true } },
   payments: {
     where: { status: 'SUCCESS' as const },
     select: { paymentReference: true, motoristId: true },
@@ -54,6 +55,10 @@ export function ledgerTicket(ticket: LedgerTicket) {
     paymentStatus: effectivePaymentStatus(ticket),
     demeritPoints:
       ticket.status === 'CANCELLED' ? 0 : ticket.demeritPointsSnapshot,
+    driverIdentification: ticket.pointsAssessment,
+    pointsDeducted: (ticket.pointsEntries ?? [])
+      .filter((e) => e.event !== 'OPENING')
+      .reduce((sum, e) => sum - e.delta, 0),
     issuedAt: ticket.issuedAt,
     dueAt: ticket.dueAt,
     category: ticket.offence.category.name,

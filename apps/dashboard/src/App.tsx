@@ -1,4 +1,5 @@
 import { Field } from './Field';
+import { PublicQrStatus } from './TicketQr';
 import { apiUrl, responseError, serviceUnavailable } from './api';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AdminPanel } from './AdminPanel';
@@ -43,6 +44,17 @@ type Offence = {
 };
 type Session = { token: string; user: User };
 export function App() {
+  const [qrToken, setQrToken] = useState(() =>
+    window.location.pathname === '/verify'
+      ? (new URLSearchParams(window.location.hash.slice(1)).get('token') ??
+        new URLSearchParams(window.location.search).get('token') ??
+        '')
+      : '',
+  );
+  useEffect(() => {
+    if (window.location.pathname === '/verify')
+      window.history.replaceState({}, '', '/verify');
+  }, []);
   const adminLogin = window.location.pathname === '/admin';
   const [session, setSession] = useState<Session | null>(null);
   const currentSession = useRef<Session | null>(null);
@@ -68,11 +80,18 @@ export function App() {
         response = await fetch(apiUrl(path), {
           method: method ?? (body === undefined ? 'GET' : 'POST'),
           headers: {
-            'Content-Type': 'application/json',
+            ...(body instanceof FormData
+              ? {}
+              : { 'Content-Type': 'application/json' }),
             ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
           },
-          body: body === undefined ? undefined : JSON.stringify(body),
-          signal: AbortSignal.timeout(10000),
+          body:
+            body instanceof FormData
+              ? body
+              : body === undefined
+                ? undefined
+                : JSON.stringify(body),
+          signal: AbortSignal.timeout(body instanceof FormData ? 60000 : 10000),
         });
       } catch {
         throw new Error(serviceUnavailable);
@@ -243,6 +262,7 @@ export function App() {
             {error}
           </p>
         )}
+        {!session && qrToken && <PublicQrStatus api={api} token={qrToken} />}
         {!session ? (
           <section className="login">
             <h2>{adminLogin ? 'Administrator sign in' : 'Sign in'}</h2>
@@ -292,6 +312,8 @@ export function App() {
           </section>
         ) : session.user.role === 'USER' ? (
           <MotoristDashboard
+            initialQrToken={qrToken}
+            onQrConsumed={() => setQrToken('')}
             api={api}
             user={session.user}
             accountToken={session.token}
@@ -618,7 +640,9 @@ export function App() {
           </StaffWorkspace>
         )}
       </main>
-      <footer className="app-footer">Academic Prototype</footer>
+      <footer className="app-footer">
+        Academic Prototype — No real payments or enforcement
+      </footer>
     </>
   );
 }
