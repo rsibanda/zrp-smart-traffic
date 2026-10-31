@@ -15,8 +15,22 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
         {
           id: 'category',
           name: 'Speeding',
-          demoFineAmount: '80',
+          demoFineAmount: '50',
           demeritPoints: 3,
+          paymentDueDays: 30,
+        },
+        {
+          id: 'dui',
+          name: 'Drunk driving (DUI)',
+          demoFineAmount: '200',
+          demeritPoints: 6,
+          paymentDueDays: 30,
+        },
+        {
+          id: 'parking',
+          name: 'Illegal parking',
+          demoFineAmount: '25',
+          demeritPoints: 0,
           paymentDueDays: 30,
         },
       ];
@@ -48,7 +62,8 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
         id: 'ticket',
         publicReference: 'ticket-reference',
         displayReference: 'INF-2026-000125',
-        demoFineAmountSnapshot: '80',
+        demoFineAmountSnapshot: '50',
+        demeritPointsSnapshot: 3,
       };
     throw new Error(`Unexpected endpoint ${path}`);
   });
@@ -59,6 +74,32 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
   });
   fireEvent.click(screen.getByRole('button', { name: 'Lookup vehicle' }));
   await screen.findByRole('heading', { name: 'ABC1234 · Toyota Corolla' });
+  expect(
+    (screen.getByRole('button', { name: 'Issue & Send' }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  expect(
+    screen.getByText(
+      'Select a valid offence category to calculate the fine and demerit points.',
+    ),
+  ).not.toBeNull();
+  // A synthetic submit must also be guarded, not only the disabled button.
+  fireEvent.submit(screen.getByLabelText('Offence category').closest('form')!);
+  expect(api.mock.calls.some(([path]) => path === '/offences')).toBe(false);
+  const summary = document.querySelector(
+    '.officer-citation-summary',
+  )! as HTMLElement;
+  for (const [id, amount, points] of [
+    ['dui', 'US$200.00', '6 Points'],
+    ['parking', 'US$25.00', '0 Points'],
+    ['category', 'US$50.00', '3 Points'],
+  ]) {
+    fireEvent.change(screen.getByLabelText('Offence category'), {
+      target: { value: id },
+    });
+    expect(within(summary).getByText(amount)).not.toBeNull();
+    expect(within(summary).getByText(points)).not.toBeNull();
+  }
   fireEvent.change(screen.getByLabelText('Location'), {
     target: { value: 'Central intersection' },
   });
@@ -81,6 +122,8 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
   await screen.findByRole('heading', { name: 'Infringement issued' });
   expect(screen.getAllByText('INF-2026-000125').length).toBeGreaterThan(0);
   expect(screen.queryByText('ticket-reference')).toBeNull();
+  expect(within(summary).getByText('US$50.00')).not.toBeNull();
+  expect(within(summary).getByText('3 Points')).not.toBeNull();
   expect(
     api.mock.calls.filter(([path]) => path.endsWith('/submit')),
   ).toHaveLength(1);

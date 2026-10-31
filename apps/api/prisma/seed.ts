@@ -160,11 +160,10 @@ async function seed() {
           demoFineAmount: '25.00',
         },
       });
+      // The ten requested categories come from the catalogue data migration.
+      // Preserve these distinct older examples without overwriting admin edits.
       for (const [code, name, amount, points] of [
-        ['TRF-SPD', 'Speeding', 150, 3],
         ['TRF-SIG', 'Failure to obey traffic signal', 120, 4],
-        ['TRF-PAR', 'Illegal parking', 40, 1],
-        ['TRF-LIC', 'Driving without valid licence', 100, 3],
         ['TRF-RDW', 'Unroadworthy vehicle', 80, 2],
         ['TRF-DIS', 'Distracted driving', 90, 2],
       ] as const) {

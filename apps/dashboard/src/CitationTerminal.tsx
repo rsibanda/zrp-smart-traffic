@@ -36,12 +36,16 @@ export function CitationTerminal({
     [category, setCategory] = useState('');
   const [vehicle, setVehicle] = useState<Vehicle | null>(null),
     [registration, setRegistration] = useState('');
-  const [draft, setDraft] = useState<{ id: string } | null>(null),
+  const [draft, setDraft] = useState<{
+      id: string;
+      category?: Category;
+    } | null>(null),
     [ticket, setTicket] = useState<{
       id: string;
       publicReference: string;
       displayReference?: string;
       demoFineAmountSnapshot: string;
+      demeritPointsSnapshot: number;
     } | null>(null);
   const [code, setCode] = useState(''),
     [error, setError] = useState(''),
@@ -50,6 +54,14 @@ export function CitationTerminal({
   const pending = useRef<unknown>(null);
   const preview = useRef<HTMLDialogElement>(null);
   const selected = categories.find((c) => c.id === category);
+  const fine =
+    ticket?.demoFineAmountSnapshot ??
+    draft?.category?.demoFineAmount ??
+    selected?.demoFineAmount;
+  const points =
+    ticket?.demeritPointsSnapshot ??
+    draft?.category?.demeritPoints ??
+    selected?.demeritPoints;
   useEffect(() => {
     let active = true;
     void api('/offence-categories')
@@ -157,6 +169,12 @@ export function CitationTerminal({
                   id={formId}
                   onSubmit={(e) => {
                     e.preventDefault();
+                    if (!selected) {
+                      setError(
+                        'Select a valid offence category before continuing.',
+                      );
+                      return;
+                    }
                     const data = new FormData(e.currentTarget);
                     if (!pending.current)
                       pending.current = {
@@ -222,6 +240,12 @@ export function CitationTerminal({
                     The selected category determines the fine and points.
                     Observation time is recorded when the draft is saved.
                   </p>
+                  {!selected && (
+                    <p role="status">
+                      Select a valid offence category to calculate the fine and
+                      demerit points.
+                    </p>
+                  )}
                 </form>
               )}
               {draft && !ticket && (
@@ -245,14 +269,12 @@ export function CitationTerminal({
             value={ticket ? 'SUBMITTED' : draft ? 'DRAFT' : 'PENDING'}
           />
           <span>Calculated Fine</span>
-          <strong className="officer-fine-total">
-            {selected
-              ? formatCurrency(selected.demoFineAmount)
-              : 'Select an offence'}
+          <strong className="officer-fine-total" aria-live="polite">
+            {fine !== undefined ? formatCurrency(fine) : 'Select an offence'}
           </strong>
           <span>Demerit Points</span>
-          <strong className="officer-points">
-            {selected ? selected.demeritPoints + ' Points' : 'Not selected'}
+          <strong className="officer-points" aria-live="polite">
+            {points !== undefined ? points + ' Points' : 'Not selected'}
           </strong>
           <p>Review the saved draft and optional evidence before issuing.</p>
           {!ticket &&
@@ -306,6 +328,7 @@ export function CitationTerminal({
               setTicket(null);
               setDraft(null);
               setVehicle(null);
+              setCategory('');
               setCode('');
               pending.current = null;
             }}
@@ -320,8 +343,8 @@ export function CitationTerminal({
           {vehicle?.registrationNumber} · {selected?.name}
         </p>
         <p>
-          {formatCurrency(selected?.demoFineAmount)} ·{' '}
-          {selected?.demeritPoints ?? 0} points
+          {fine !== undefined ? formatCurrency(fine) : 'Select an offence'} ·{' '}
+          {points ?? 'Not selected'} points
         </p>
         <p>
           {vehicle?.motoristId

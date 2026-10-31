@@ -30,14 +30,14 @@ describe('Verified driver points ledger', () => {
         .set(auth(i))
         .expect(200)
     ).body;
-  const draft = async (responsible = true) => {
+  const draft = async (responsible = true, selectedCategory = categoryId) => {
     const result = await request(app.getHttpServer())
       .post('/api/v1/offences')
       .set(auth(2))
       .send({
         requestKey: randomUUID(),
         vehicleId,
-        categoryId,
+        categoryId: selectedCategory,
         notes: '',
         location: 'Synthetic junction',
         observedAt: new Date().toISOString(),
@@ -281,5 +281,106 @@ describe('Verified driver points ledger', () => {
         .send({ status, notes: 'Restore full recorded debit.' })
         .expect(201);
     expect((await balance()).remaining).toBe(12);
+  });
+  it('uses catalogue penalties across officer, supervisor and motorist reads, freezes issued values and debits only once', async () => {
+    const start = (await balance()).totalDeducted;
+    let deducted = 0;
+    for (const [name, amount, points] of [
+      ['Speeding', 50, 3],
+      ['Drunk driving (DUI)', 200, 6],
+      ['Running a red light', 80, 4],
+      ['Mobile phone use while driving', 40, 3],
+      ['Reckless driving', 150, 6],
+      ['Driving without a valid licence', 100, 5],
+      ['Failure to wear a seatbelt', 30, 2],
+      ['Illegal parking', 25, 0],
+      ['Driving an unregistered vehicle', 75, 3],
+      ['Failure to obey traffic signs', 40, 2],
+    ] as const) {
+      // Configure only this suite's isolated category; never edit real catalogue rows.
+      await db.offenceCategory.update({
+        where: { id: categoryId },
+        data: { name, demoFineAmount: amount, demeritPoints: points },
+      });
+      const catalogue = await request(app.getHttpServer())
+        .get('/api/v1/offence-categories')
+        .set(auth(2))
+        .expect(200);
+      expect(
+        catalogue.body.find((c: { id: string }) => c.id === categoryId),
+      ).toMatchObject({
+        name,
+        demoFineAmount: String(amount),
+        demeritPoints: points,
+      });
+      const id = await draft();
+      expect((await balance()).totalDeducted).toBe(start + deducted);
+      const ticket = await issue(id);
+      expect(ticket).toMatchObject({
+        demoFineAmountSnapshot: String(amount),
+        demeritPointsSnapshot: points,
+      });
+      // An administrator changing future penalties cannot reprice an issued ticket.
+      await db.offenceCategory.update({
+        where: { id: categoryId },
+        data: { demoFineAmount: 999, demeritPoints: 10 },
+      });
+      expect((await issue(id)).id).toBe(ticket.id);
+      for (const role of [1, 2]) {
+        const read = await request(app.getHttpServer())
+          .get(`/api/v1/offences/${id}`)
+          .set(auth(role))
+          .expect(200);
+        expect(read.body.category.name).toBe(name);
+        expect(read.body.ticket).toMatchObject({
+          demoFineAmountSnapshot: String(amount),
+          demeritPointsSnapshot: points,
+        });
+      }
+      const motorist = await request(app.getHttpServer())
+        .get(`/api/v1/motorist/infringements/${ticket.publicReference}`)
+        .set(auth(3))
+        .expect(200);
+      expect(motorist.body).toMatchObject({
+        category: name,
+        amount: String(amount),
+        demeritPoints: points,
+        pointsDeducted: points,
+      });
+      deducted += points;
+      expect((await balance()).totalDeducted).toBe(start + deducted);
+      expect((await balance()).remaining).toBe(Math.max(0, 12 - deducted));
+      expect((await balance(4)).status).toBe('PENDING_DRIVER_IDENTIFICATION');
+      expect(
+        await db.driverPointsLedger.count({
+          where: { ticketId: ticket.id, event: 'ISSUANCE' },
+        }),
+      ).toBe(1);
+    }
+  });
+  it('rejects unknown or inactive categories without creating an infringement or points debit', async () => {
+    const before = await db.offence.count({ where: { officerId: ids[2] } });
+    await db.offenceCategory.update({
+      where: { id: categoryId },
+      data: { active: false },
+    });
+    for (const selectedCategory of [randomUUID(), categoryId]) {
+      await request(app.getHttpServer())
+        .post('/api/v1/offences')
+        .set(auth(2))
+        .send({
+          requestKey: randomUUID(),
+          vehicleId,
+          categoryId: selectedCategory,
+          notes: '',
+          location: 'Synthetic junction',
+          observedAt: new Date().toISOString(),
+          responsibleDriverId: driverId,
+        })
+        .expect(400);
+    }
+    expect(await db.offence.count({ where: { officerId: ids[2] } })).toBe(
+      before,
+    );
   });
 });
