@@ -39,3 +39,7 @@ Verified locally:
 - `npm run build`: API and Vite production builds passed. `git diff --check` passed.
 
 No accounts were reseeded, no historical deductions were recalculated, and no hosted deployment or database change was performed. Native source and layout are unchanged; its existing catalogue-based calculations use the same updated API. Native device interaction was not retested in this increment.
+
+## Hosted deployment follow-up
+
+At the user's subsequent deployment request, commit `b80e38e` was deployed to Render and verified against the already-published matching Netlify build. All 14 hosted migrations are applied after an isolated Neon-copy check. The running Officer and Supervisor APIs return all ten exact category/penalty pairs. Existing records and private evidence were preserved. See [deployment results and login verification limits](../DEPLOYMENT.md#deployment---31-october-2026).

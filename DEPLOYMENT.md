@@ -1,6 +1,21 @@
 # GitHub + Netlify deployment
 
-## Pending source increment — 30 October 2026
+## Deployment - 31 October 2026
+
+Commit `b80e38e270b2d2e305c2b6f8721ddb4a680cfa72` is live on the existing Render API and Netlify frontend. Render deployment `dep-dbj38rp42hec73btp17g` reached `live`. Netlify's automatic deployment had already published the web changes; its public `index-DvDC_3qn.js` bundle was byte-for-byte identical to the current production build using the Render API origin.
+
+- Application: https://thunderous-moxie-b0872a.netlify.app
+- API: https://zrp-traffic-api.onrender.com
+- All 14 migrations are applied. The five pending QR/application/category/driver-points/offence-catalogue migrations first passed on the isolated Neon copy `br-tiny-queen-b1ajrjuh`, with automatic expiry `2026-11-01T15:57:40Z`, then on production.
+- Before/after checksums preserved all existing fields in 6 users, 1 driver, 1 vehicle, 6 offences, 5 tickets, 1 evidence record, 1 payment and 1 vehicle-link request. No reseed, password reset, ownership reassignment or historical point deduction occurred. The hosted catalogue now has the 10 requested specific categories plus its existing generic fallback.
+- `PUBLIC_SITE_URL` is now the existing HTTPS frontend origin. Private S3 settings and the free hosting plans are unchanged. The existing evidence object's bytes/hash were verified through authenticated storage access; anonymous API access returned 401. The available test accounts did not have access to that historical offence, so an authenticated application download was not claimed.
+- Hosted Officer and Supervisor login, profile, category values, permitted offence reads, forbidden administrator access, logout and expired-session denial passed. Supervisor summary, payments and vehicle review APIs and Officer vehicle lookup also passed. Health returned 200; CORS and the QR origin configuration matched the frontend.
+- The historical `@demo.invalid` addresses in older instructions are no longer the hosted accounts. The saved Windows-user password matches one current Officer and one Supervisor account; their actual addresses were obtained from existing account records without changing credentials. Administrator and Motorist login were not retested because that saved password does not match their current accounts. Use the current hosted account credentials, not the historical shared-account instructions below.
+- The stored Netlify API token returned 401. This did not block publishing: the latest frontend was already automatically deployed and independently verified against the production build. Renew that token before future manual Netlify management.
+
+The current source had already been committed and pushed by the time deployment began; no additional application commit or push was needed. Production web build passed again with the hosted API origin. Local validation for this release: lint, typecheck, 52 API unit tests, 53 integration tests, 28 web tests and API/web production builds passed. See [offence catalogue details](docs/offence-catalogue-2026-10-31.md). Physical-camera QR acceptance and real-browser visual checks remain separate from these HTTP/API checks. The installed emulator APK still targets the local API; it was not replaced with a hosted-API APK in this deployment.
+
+## Historical pending source increment — 30 October 2026
 
 The new QR/application/driver-points source changes are **not deployed**. Earlier live verification below applies to the previously published version. Deployment preparation and hardware acceptance are documented in [ticket applications and points](docs/ticket-applications-points.md).
 

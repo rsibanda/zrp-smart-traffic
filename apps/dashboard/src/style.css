@@ -1190,6 +1190,7 @@ dialog::backdrop {
 }
 .motorist-workspace .pay-action {
   background: #07518a;
+  color: #ffffff;
   border-color: #07518a;
   border-radius: 9px;
   min-width: 104px;
@@ -1388,6 +1389,13 @@ dialog::backdrop {
 .officer-mobile-label,
 .officer-mobile-issue {
   display: none;
+}
+/* Override the base teal label and pale hover background on this blue action. */
+button.officer-mobile-issue,
+button.officer-mobile-issue:is(:hover, :focus, :active) {
+  background: #07518a;
+  color: #ffffff;
+  font-weight: 600;
 }
 .officer-welcome > p {
   font-size: 0.95rem;
@@ -1602,7 +1610,6 @@ dialog::backdrop {
     width: 100%;
     margin-top: 16px;
     min-height: 48px;
-    background: #07518a;
   }
   .officer-dashboard-citation,
   .officer-queues {

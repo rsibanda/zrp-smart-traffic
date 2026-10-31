@@ -4,6 +4,8 @@
 
 ## Current increment
 
+Hosted release: the 31 October web/API source is live at https://thunderous-moxie-b0872a.netlify.app with all 14 migrations applied. See [current deployment verification and credential notes](DEPLOYMENT.md#deployment---31-october-2026). Earlier pending-deployment notes below are historical; physical-camera acceptance remains pending.
+
 The 31 October offence catalogue update adds ten configurable demonstration penalties and verifies immediate citation calculations and consistent issued-ticket snapshots. See [catalogue values, migration and verification](docs/offence-catalogue-2026-10-31.md). Existing tickets and driver-point history are preserved; apply migrations without reseeding accounts.
 
 The 30 October increment adds secure ticket QR verification, private vehicle applications with supervisor decisions, configurable application fees and payment simulation, and a verified-driver remaining-points ledger. See [setup, workflows and security decisions](docs/ticket-applications-points.md) and [validation status](docs/remaining-work-2026-10-30.md). The interface notice is **Academic Prototype — No real payments or enforcement**. New hosted/device acceptance remains pending; these changes have not been published.
