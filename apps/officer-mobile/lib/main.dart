@@ -755,7 +755,7 @@ class _OfficerScreenState extends State<OfficerScreen> {
           : Scaffold(
               appBar: AppBar(
                   toolbarHeight: 104,
-                  title: const ProductBrand(onNavy: false, compact: true)),
+                  title: const ProductBrand(compact: true)),
               body: SafeArea(
                   child: ListView(padding: const EdgeInsets.all(20), children: [
                 if (busy) const LinearProgressIndicator(),

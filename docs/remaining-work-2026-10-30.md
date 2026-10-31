@@ -70,3 +70,15 @@ No hosted migration, deployment, commit or push was performed. Apply the documen
 - A QR may be scanned repeatedly while valid; this is deliberate read-only reuse. Rotation revokes previous tokens, cancellation invalidates them, and expiry is enforced. Payment keeps its existing authenticated idempotency checks.
 - No migration backfill will deduct historical driver points. New ledger events will be explicitly versioned and activated only after the new verified-driver workflow exists.
 - Development verification uses local PostgreSQL; never run fixture tests or reset/seed the hosted database.
+
+## Follow-up verification - 31 October 2026
+
+The implementation above was already present in repository commit `f842bb2` when work resumed. Existing work was preserved; no commit, push or hosted deployment was performed during this follow-up.
+
+- Restarted the existing local services with `scripts/start-demo.ps1`. PostgreSQL retained its records, all 13 migrations were current, and the API health endpoint and web application returned HTTP 200.
+- Started Pixel_8 for headless emulator verification. Its cold boot took approximately eight minutes. Installed the updated debug APK successfully using `adb install --no-streaming -r`, preserving application data, and confirmed a successful activity launch.
+- Actual emulator inspection found insufficient contrast in the login header. Changed `apps/officer-mobile/lib/main.dart` to use the existing navy-background `ProductBrand` styling. No authentication, permissions or navigation logic changed.
+- Re-ran `flutter analyze` (no issues), `flutter test` (27 passed), and the emulator-targeted debug APK build (passed; 551.6 seconds), then successfully reinstalled the APK.
+- Inspected the final emulator screenshots: the Smart Traffic title is readable in white, the eyebrow and subtitle are muted, and the account-type dropdown offers User, Officer and Supervisor. Local screenshots are retained under ignored `.tools/pixel8-final-login.png` and `.tools/pixel8-final-account-types.png`.
+
+This verifies the native login layout and role selector on an emulator; it does not establish physical-camera capture or two-device QR acceptance. The earlier hosted ADMIN HTTP 401, missing local `PUBLIC_SITE_URL`, hosted deployment/private-S3 checks and real-browser/physical-device acceptance remain outstanding. The installed APK uses the local emulator API URL, not the hosted API.
