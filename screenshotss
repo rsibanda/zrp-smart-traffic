@@ -1,0 +1,31 @@
+/**
+ * STS - Integration & System Testing Suite (Supertest / Jest)
+ * Validates end-to-end data flow between Officer App, Express API, PostgreSQL, and Demerit Engine.
+ */
+const request = require('supertest');
+const app = require('../server');
+
+describe('STS End-to-End Integration & Performance Testing', () => {
+  const testOfficerToken = 'Bearer mock_jwt_officer_token_xyz';
+
+  test('Integration: End-to-end vehicle compliance audit and demerit calculation', async () => {
+    const startTime = Date.now();
+
+    // 1. Execute live compliance check through API to PostgreSQL & Demerit Engine
+    const response = await request(app)
+      .get('/api/v1/enforcement/verify?plate=AEB-1234&location=Copacabana')
+      .set('Authorization', testOfficerToken);
+
+    const responseTime = Date.now() - startTime;
+
+    // 2. Verify seamless data flow and correct computational response
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.vehicle).toHaveProperty('demeritPoints');
+    expect(response.body.vehicle).toHaveProperty('isLicenceValid');
+
+    // 3. System testing validation: Verify response time meets low-latency operational standards (< 500ms)
+    console.info(`[STS System Test Metric]: End-to-end operational query resolved in ${responseTime}ms`);
+    expect(responseTime).toBeLessThan(500);
+  });
+});

@@ -38,7 +38,10 @@ export class TrafficController {
   async vehicles(@Query() query: VehicleQuery) {
     const vehicle = await this.db.vehicle.findUnique({
       where: { registrationNumber: query.registration },
-      include: { driver: { select: { fullName: true, licenceStatus: true } } },
+      include: {
+        driver: { select: { fullName: true, licenceStatus: true } },
+        motorist: { select: { name: true } },
+      },
     });
     return { items: vehicle ? [vehicle] : [] };
   }
@@ -47,7 +50,10 @@ export class TrafficController {
   async vehicle(@Param('id', ParseUUIDPipe) id: string) {
     const result = await this.db.vehicle.findUnique({
       where: { id },
-      include: { driver: { select: { fullName: true, licenceStatus: true } } },
+      include: {
+        driver: { select: { fullName: true, licenceStatus: true } },
+        motorist: { select: { name: true } },
+      },
     });
     if (!result) throw new NotFoundException('No matching records.');
     return result;

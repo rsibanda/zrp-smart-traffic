@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Officer app (Android emulator)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "apps/officer-mobile",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define=API_URL=http://10.0.2.2:3000/api/v1"]
+    }
+  ]
+}

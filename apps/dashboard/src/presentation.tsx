@@ -1,3 +1,31 @@
+export const DEFAULT_CURRENCY = 'USD';
+export function formatCurrency(
+  value: string | number | null | undefined,
+  currency = DEFAULT_CURRENCY,
+) {
+  const amount = Number(value ?? 0);
+  return new Intl.NumberFormat('en-ZW', {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'symbol',
+  })
+    .format(amount)
+    .replace(/^\$/, 'US$');
+}
+export function paymentMethodLabel(method?: string | null) {
+  return (
+    (
+      { ECOCASH: 'EcoCash', INNBUCKS: 'InnBucks', CARD: 'Bank Card' } as Record<
+        string,
+        string
+      >
+    )[method ?? ''] ?? 'Payment'
+  );
+}
+// Opaque lookup keys remain API-only. Older servers show a neutral label.
+export function ticketLabel(ticket: { displayReference?: string }) {
+  return ticket.displayReference ?? 'Traffic ticket';
+}
 export function readable(value: string) {
   return value
     .toLowerCase()
@@ -21,7 +49,7 @@ export function statusLabel(status: string, kind = 'offence') {
   if (kind === 'incident')
     return (
       (
-        { OPEN: 'Submitted', IN_PROGRESS: 'Under review' } as Record<
+        { OPEN: 'Submitted', IN_PROGRESS: 'Under Review' } as Record<
           string,
           string
         >
@@ -36,7 +64,7 @@ export function statusLabel(status: string, kind = 'offence') {
         >
       )[status] ?? readable(status)
     );
-  return readable(status);
+  return status === 'SUCCESS' ? 'Paid' : readable(status);
 }
 export function StatusBadge({ value, kind }: { value: string; kind?: string }) {
   return (

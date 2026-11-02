@@ -60,6 +60,21 @@ it('opens motorist services only after User sign-in and clears them on sign-out'
       };
     }
     if (url.endsWith('/auth/logout')) return { ok: true, status: 204 };
+    if (url.includes('/motorist/'))
+      return {
+        ok: true,
+        status: 200,
+        json: async () =>
+          url.endsWith('/dashboard')
+            ? {
+                totalPayable: 0,
+                pendingFines: 0,
+                demeritPoints: 0,
+                paidFines: 0,
+                registeredVehicles: 0,
+              }
+            : { items: [], total: 0 },
+      };
     if (url.endsWith('/public/notices'))
       return {
         ok: true,
@@ -78,7 +93,7 @@ it('opens motorist services only after User sign-in and clears them on sign-out'
     target: { value: 'demo-test-only' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-  await screen.findByRole('heading', { name: 'My motorist services' });
+  await screen.findByRole('heading', { name: 'Welcome back, Demo User' });
   expect(screen.queryByText('Your activity')).toBeNull();
   expect(fetchMock.mock.calls.some(([url]) => url.includes('/offences'))).toBe(
     false,

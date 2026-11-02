@@ -28,6 +28,9 @@ describe('Request validation', () => {
   });
   it.each([
     { role: 'ADMIN' },
+    { categoryIds: [] },
+    { categoryIds: ['not-a-uuid'] },
+    { categoryIds: [draft.categoryId, draft.categoryId] },
     { latitude: 91, longitude: 30 },
     { observedAt: '2026-09-21T12:00:00' },
     { observedAt: '2026-02-30T12:00:00Z' },
@@ -39,5 +42,23 @@ describe('Request validation', () => {
         { type: 'body', metatype: CreateOffenceDto },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+  it('accepts a distinct category array for the multi-offence client', async () => {
+    const { categoryId, ...fields } = draft;
+    const result = await pipe.transform(
+      {
+        ...fields,
+        categoryIds: [categoryId, '44444444-4444-4444-8444-444444444444'],
+      },
+      { type: 'body', metatype: CreateOffenceDto },
+    );
+    expect(result.categoryIds).toHaveLength(2);
+  });
+  it('allows empty optional notes while retaining a string contract', async () => {
+    const result = await pipe.transform(
+      { ...draft, notes: '' },
+      { type: 'body', metatype: CreateOffenceDto },
+    );
+    expect(result.notes).toBe('');
   });
 });

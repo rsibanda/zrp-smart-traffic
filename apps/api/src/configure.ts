@@ -1,9 +1,17 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  INestApplication,
+  RequestMethod,
+  ValidationPipe,
+} from '@nestjs/common';
+import { runtimeConfig } from './environment';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { addResponseContracts } from './response-contracts';
 
 export function configure(app: INestApplication) {
+  const settings = runtimeConfig();
+  if (settings.trustProxy?.length)
+    app.getHttpAdapter().getInstance().set('trust proxy', settings.trustProxy);
   app.use(helmet());
   app.use(
     (
@@ -15,7 +23,9 @@ export function configure(app: INestApplication) {
       next();
     },
   );
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: [{ path: 'health', method: RequestMethod.GET }],
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -24,14 +34,15 @@ export function configure(app: INestApplication) {
     }),
   );
   app.enableCors({
-    origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
+    origin: settings.origins,
     methods: ['GET', 'POST', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
+  if (settings.production) return;
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle('ZRP Smart Traffic Management System')
+      .setTitle('Smart Traffic — In support of ZRP')
       .setDescription(
         'Academic Prototype. Traffic management API; payments are simulated.',
       )

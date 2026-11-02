@@ -2,6 +2,8 @@
 
 Base: `/api/v1`. Interactive route and request DTO documentation: `/api/docs` (JSON: `/api/docs-json`). DTO fields reject unknown properties. Explicit safe success and error response schemas are included in Swagger.
 
+The 30 October additions (ticket QR, private vehicle applications, catalogue fees and verified-driver points) are documented in [ticket applications and points](ticket-applications-points.md#api-additions). Existing routes remain compatible; `responsibleDriverId` is optional on draft creation and cannot be reassigned by the draft-update endpoint.
+
 Use `Authorization: Bearer <token>` from login. Sessions expire after 30 minutes; login again. Logout revokes the session. Expired/inactive sessions return 401. Disallowed roles return 403; inaccessible object IDs return 404.
 
 | Route                              | Role                              | Behaviour                                                                            |
@@ -67,3 +69,19 @@ Public ticket responses contain only warning, reference, demoAmount, status, iss
 `POST /auth/login` accepts optional `category`: USER, OFFICER, SUPERVISOR or ADMIN. A category that differs from the stored account role returns the same generic 401 as invalid credentials. The main UI offers the first three categories; `/admin` retains administration.
 
 `POST /public/tickets/verify` and `POST /public/incidents` now require a USER account bearer token. Anonymous callers receive 401; staff roles receive 403. Restricted ticket tokens remain separate and are bound to the account session, so account logout, expiry or revocation also ends ticket access. Public incident retries are scoped to the reporting user. Notices remain anonymous read-only information.
+
+## Motorist account and payment endpoints
+
+See [the account/payment API table and ownership rules](interface-and-payments.md). All new routes retain `/api/v1`, session authentication and server-side ownership. Payment initiation accepts `{ requestKey, reference, method, last4? }`; method is ECOCASH, INNBUCKS or CARD (CARD requires the supplied test `last4=4242`). Outcome accepts `{ outcome }`: APPROVE, DECLINE, TIMEOUT, ERROR or CANCEL. No amount, motorist ID, phone, PAN or CVV is accepted. OpenAPI includes the DTOs and response schemas. Processing expires after 15 minutes; terminal outcomes are idempotent. There are no provider callbacks.
+
+### Ticket display and currency additions
+
+Ticket responses include `displayReference` (INF-year-number). Motorist lists/details also include nullable `receiptPaymentReference` for the owned successful payment. Payment history and receipts add `ticketDisplayReference`; existing request references remain unchanged. Ticket verification accepts the readable or opaque reference and still requires its code and authenticated session. Staff search matches either reference. Motorist amounts report `currency: USD`; payments report their stored currency. Vehicle lookup adds the linked motorist name only. Observation notes may be an empty string; whitespace-only notes remain invalid.
+
+## Motorist vehicle management
+
+The authenticated vehicle inventory now includes vehicle-specific summaries. New account-scoped detail/status, registration-check, pending link/unlink request and nickname endpoints extend the existing Vehicle relationship. Review requires an explicit verification acknowledgement and review note. The command-centre brief now authorises SUPERVISOR review through dedicated supervisor routes; administrative routes remain ADMIN-only. Full route/DTO and ownership details: [vehicle-management.md](vehicle-management.md).
+
+## Supervisor command centre
+
+See [supervisor-reference-layout.md](supervisor-reference-layout.md) for additive summary, scoped payment and audited vehicle-request endpoints. Existing offence responses include minimal issuing-officer and linked-ticket-motorist names. No database migration is needed.

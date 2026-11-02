@@ -45,6 +45,15 @@ model User {
   checkpoints Checkpoint[]
   alerts TrafficAlert[]
   uploads Evidence[]
+  vehicles Vehicle[] @relation("MotoristVehicles")
+  motoristTickets Ticket[] @relation("MotoristTickets")
+  payments Payment[]
+  vehicleRequests VehicleLinkRequest[] @relation("VehicleRequester")
+  reviewedVehicleRequests VehicleLinkRequest[] @relation("VehicleReviewer")
+  applicationFiles VehicleApplicationFile[]
+  applicationDecisions VehicleApplicationDecision[]
+  verifiedDriver Driver? @relation("DriverAccount")
+  pointsEvents DriverPointsLedger[]
 }
 model OfficerProfile {
   id String @id @default(uuid()) @db.Uuid
@@ -69,6 +78,40 @@ model Driver {
   licenceNumber String @unique
   licenceStatus String
   vehicles Vehicle[]
+  motoristId String? @unique @db.Uuid
+  motorist User? @relation("DriverAccount", fields: [motoristId], references: [id])
+  identityVerifiedAt DateTime?
+  pointsAccount DriverPointsAccount?
+  responsibleOffences Offence[] @relation("ResponsibleDriver")
+}
+model DriverPointsPolicy {
+  key String @id
+  allowance Int @default(12)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+}
+model DriverPointsAccount {
+  driverId String @id @db.Uuid
+  driver Driver @relation(fields: [driverId], references: [id])
+  startingAllowance Int
+  policyVersion Int
+  createdAt DateTime @default(now())
+  entries DriverPointsLedger[]
+}
+model DriverPointsLedger {
+  id String @id @default(uuid()) @db.Uuid
+  driverId String @db.Uuid
+  account DriverPointsAccount @relation(fields: [driverId], references: [driverId])
+  ticketId String? @db.Uuid
+  ticket Ticket? @relation(fields: [ticketId], references: [id])
+  event String
+  delta Int
+  actorId String @db.Uuid
+  actor User @relation(fields: [actorId], references: [id])
+  reason String
+  createdAt DateTime @default(now())
+  @@unique([ticketId, event])
+  @@index([driverId, createdAt])
 }
 model Vehicle {
   id String @id @default(uuid()) @db.Uuid
@@ -80,6 +123,117 @@ model Vehicle {
   driverId String? @db.Uuid
   driver Driver? @relation(fields: [driverId], references: [id])
   offences Offence[]
+  motoristId String? @db.Uuid
+  nickname String?
+  linkVerifiedAt DateTime?
+  motorist User? @relation("MotoristVehicles", fields: [motoristId], references: [id])
+  @@index([motoristId])
+}
+
+enum VehicleRequestKind {
+  LINK
+  UNLINK
+  APPLICATION
+}
+enum VehicleRequestStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  CHANGES_REQUESTED
+}
+// Requests are review history; Vehicle.motoristId remains the sole ownership link.
+model VehicleLinkRequest {
+  id String @id @default(uuid()) @db.Uuid
+  motoristId String @db.Uuid
+  motorist User @relation("VehicleRequester", fields: [motoristId], references: [id], onDelete: Cascade)
+  registration String
+  kind VehicleRequestKind @default(LINK)
+  status VehicleRequestStatus @default(PENDING)
+  submittedAt DateTime @default(now())
+  reviewedAt DateTime?
+  reviewedBy String? @db.Uuid
+  reviewer User? @relation("VehicleReviewer", fields: [reviewedBy], references: [id])
+  reviewNote String?
+  application VehicleApplication?
+  @@index([motoristId, submittedAt])
+  @@index([status, submittedAt])
+}
+model VehicleCategory {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique
+  label String
+  feeMinor Int
+  currency String @default("USD")
+  active Boolean @default(true)
+  updatedAt DateTime @updatedAt
+  applications VehicleApplication[]
+}
+// Extends the existing review request; Vehicle.motoristId remains authoritative.
+model VehicleApplication {
+  requestId String @id @db.Uuid
+  request VehicleLinkRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestKey String @unique @db.Uuid
+  categoryId String @db.Uuid
+  category VehicleCategory @relation(fields: [categoryId], references: [id])
+  make String
+  model String
+  year Int
+  colour String
+  chassis String
+  engine String @default("")
+  relationship String
+  declaration Boolean @default(false)
+  feeMinor Int
+  currency String @default("USD")
+  revision Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  files VehicleApplicationFile[]
+  decisions VehicleApplicationDecision[]
+  payments VehicleApplicationPayment[]
+}
+model VehicleApplicationFile {
+  id String @id @default(uuid()) @db.Uuid
+  applicationId String @db.Uuid
+  application VehicleApplication @relation(fields: [applicationId], references: [requestId], onDelete: Cascade)
+  kind String
+  storageKey String @unique
+  mimeType String
+  byteSize Int
+  sha256 String
+  uploadedBy String @db.Uuid
+  uploader User @relation(fields: [uploadedBy], references: [id])
+  createdAt DateTime @default(now())
+  @@unique([applicationId, kind])
+}
+model VehicleApplicationDecision {
+  id String @id @default(uuid()) @db.Uuid
+  applicationId String @db.Uuid
+  application VehicleApplication @relation(fields: [applicationId], references: [requestId], onDelete: Cascade)
+  status VehicleRequestStatus
+  reason String
+  reviewerId String @db.Uuid
+  reviewer User @relation(fields: [reviewerId], references: [id])
+  createdAt DateTime @default(now())
+  @@index([applicationId, createdAt])
+}
+model VehicleApplicationPayment {
+  id String @id @default(uuid()) @db.Uuid
+  applicationId String @db.Uuid
+  application VehicleApplication @relation(fields: [applicationId], references: [requestId])
+  requestKey String @unique @db.Uuid
+  reference String @unique
+  receiptReference String? @unique
+  method PaymentMethod
+  status PaymentStatus @default(PROCESSING)
+  feeMinor Int
+  currency String @default("USD")
+  createdAt DateTime @default(now())
+  paidAt DateTime?
+  @@index([applicationId, createdAt])
 }
 model OffenceCategory {
   id String @id @default(uuid()) @db.Uuid
@@ -88,7 +242,10 @@ model OffenceCategory {
   description String
   demoFineAmount Decimal @db.Decimal(10, 2)
   active Boolean @default(true)
+  demeritPoints Int @default(0)
+  paymentDueDays Int @default(30)
   offences Offence[]
+  charges OffenceCharge[]
 }
 model Offence {
   id String @id @default(uuid()) @db.Uuid
@@ -113,6 +270,10 @@ model Offence {
   reviewNotes String?
   ticket Ticket?
   evidence Evidence[]
+  charges OffenceCharge[]
+  responsibleDriverId String? @db.Uuid
+  responsibleDriver Driver? @relation("ResponsibleDriver", fields: [responsibleDriverId], references: [id])
+  driverConfirmedAt DateTime?
   @@index([officerId, createdAt])
   @@index([supervisorId, status])
 }
@@ -120,11 +281,67 @@ model Ticket {
   id String @id @default(uuid()) @db.Uuid
   offenceId String @unique @db.Uuid
   offence Offence @relation(fields: [offenceId], references: [id])
+  displayReference String @unique @default(dbgenerated("next_ticket_reference()"))
   publicReference String @unique
   demoFineAmountSnapshot Decimal @db.Decimal(10, 2)
   status TicketStatus @default(ISSUED)
   issuedAt DateTime @default(now())
   publicAccess PublicTicketAccess?
+  motoristId String? @db.Uuid
+  motorist User? @relation("MotoristTickets", fields: [motoristId], references: [id])
+  demeritPointsSnapshot Int @default(0)
+  pointsAssessment String @default("LEGACY_NOT_ASSESSED")
+  dueAt DateTime?
+  payments Payment[]
+  qrTokens TicketVerificationToken[]
+  pointsEntries DriverPointsLedger[]
+  @@index([motoristId, issuedAt])
+}
+
+model TicketVerificationToken {
+  id String @id @default(uuid()) @db.Uuid
+  ticketId String @db.Uuid
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  @@index([ticketId, revokedAt])
+  @@index([expiresAt])
+}
+enum PaymentMethod {
+  LEGACY
+  ECOCASH
+  INNBUCKS
+  CARD
+}
+enum PaymentStatus {
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+  TIMED_OUT
+}
+model Payment {
+  id String @id @default(uuid()) @db.Uuid
+  paymentReference String @unique
+  requestKey String @unique @db.Uuid
+  ticketId String @db.Uuid
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  motoristId String @db.Uuid
+  motorist User @relation(fields: [motoristId], references: [id])
+  amount Decimal @db.Decimal(10, 2)
+  currency String @default("USD")
+  method PaymentMethod
+  status PaymentStatus @default(PROCESSING)
+  last4 String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  paidAt DateTime?
+  receiptReference String? @unique
+  failureReason String?
+  @@index([motoristId, createdAt])
+  @@index([ticketId, status])
 }
 model AuditEvent {
   id String @id @default(uuid()) @db.Uuid
@@ -227,4 +444,16 @@ model Evidence {
   uploader User @relation(fields: [uploadedBy], references: [id])
   createdAt DateTime @default(now())
   @@unique([offenceId, sha256])
+}
+
+// One infringement retains its ticket/reference, evidence, review and points ledger.
+model OffenceCharge {
+  offenceId String @db.Uuid
+  categoryId String @db.Uuid
+  offence Offence @relation(fields: [offenceId], references: [id], onDelete: Cascade)
+  category OffenceCategory @relation(fields: [categoryId], references: [id])
+  nameSnapshot String?
+  fineSnapshot Decimal? @db.Decimal(10, 2)
+  pointsSnapshot Int?
+  @@id([offenceId, categoryId])
 }

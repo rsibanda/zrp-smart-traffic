@@ -1,3 +1,5 @@
+import { offenceLines } from './offence-lines';
+import { CURRENCY } from './currency';
 import {
   BadRequestException,
   Body,
@@ -18,7 +20,7 @@ import { ApiBearerAuth, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { IsBoolean, IsString, Length, Matches } from 'class-validator';
 import { Request } from 'express';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { Prisma } from '../generated/client';
 import { hashToken, Roles, SessionGuard, StaffRequest } from './auth';
 import { scope } from './offences.service';
@@ -41,15 +43,25 @@ const warning = 'Academic Prototype';
 async function publicTicket(tx: Prisma.TransactionClient, ticketId: string) {
   const ticket = await tx.ticket.findUniqueOrThrow({
     where: { id: ticketId },
-    include: { publicAccess: true, offence: { include: { category: true } } },
+    include: {
+      publicAccess: true,
+      offence: {
+        include: { category: true, charges: { include: { category: true } } },
+      },
+    },
   });
   return {
     warning,
     reference: ticket.publicReference,
+    displayReference: ticket.displayReference,
+    currency: CURRENCY,
     demoAmount: ticket.demoFineAmountSnapshot,
     status: ticket.status,
     issuedAt: ticket.issuedAt,
-    category: ticket.offence.category.name,
+    category: offenceLines(ticket.offence)
+      .map((c) => c.name)
+      .join(', '),
+    offences: offenceLines(ticket.offence),
     paymentStatus: ticket.publicAccess?.paidAt
       ? 'SIMULATED_PAID'
       : 'NOT_SIMULATED',
@@ -99,15 +111,55 @@ export class PublicController {
         account.user.role !== 'USER'
       )
         throw new UnauthorizedException('Sign in required');
-      const ticket = await tx.ticket.findUnique({
-        where: { publicReference: dto.reference },
+      const ticket = await tx.ticket.findFirst({
+        where: {
+          OR: [
+            { publicReference: dto.reference },
+            { displayReference: dto.reference },
+          ],
+        },
         include: { publicAccess: true },
       });
       if (
         !ticket?.publicAccess ||
-        ticket.publicAccess.codeHash !== hashToken(dto.verificationCode)
+        ticket.publicAccess.codeHash !== hashToken(dto.verificationCode) ||
+        (ticket.motoristId !== null && ticket.motoristId !== req.actor.id)
       )
         throw new UnauthorizedException('Ticket verification failed');
+      if (!ticket.motoristId) {
+        await tx.ticket.update({
+          where: { id: ticket.id },
+          data: { motoristId: req.actor.id },
+        });
+        await tx.auditEvent.create({
+          data: {
+            actorId: req.actor.id,
+            action: 'TICKET_LINK_VERIFIED',
+            entityType: 'Ticket',
+            entityId: ticket.id,
+          },
+        });
+      }
+      if (
+        ticket.publicAccess.paidAt &&
+        !(await tx.payment.findFirst({
+          where: { ticketId: ticket.id, status: 'SUCCESS' },
+        }))
+      ) {
+        await tx.payment.create({
+          data: {
+            ticketId: ticket.id,
+            motoristId: req.actor.id,
+            requestKey: randomUUID(),
+            paymentReference: `PAY-${randomBytes(12).toString('hex')}`,
+            amount: ticket.demoFineAmountSnapshot,
+            method: 'LEGACY',
+            status: 'SUCCESS',
+            paidAt: ticket.publicAccess.paidAt,
+            receiptReference: ticket.publicAccess.receiptReference,
+          },
+        });
+      }
       const token = randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + 600000);
       await tx.publicTicketSession.deleteMany({
@@ -140,14 +192,19 @@ export class PublicController {
       throw new UnauthorizedException('Verify the traffic ticket first');
     const session = await tx.publicTicketSession.findUnique({
       where: { tokenHash: hashToken(match[1]) },
-      include: { accountSession: { include: { user: true } } },
+      include: {
+        accountSession: { include: { user: true } },
+        access: { include: { ticket: true } },
+      },
     });
     if (
       !session ||
       session.expiresAt <= new Date() ||
       session.accountSession.expiresAt <= new Date() ||
       !session.accountSession.user.active ||
-      session.accountSession.user.role !== 'USER'
+      session.accountSession.user.role !== 'USER' ||
+      (session.access.ticket.motoristId !== null &&
+        session.access.ticket.motoristId !== session.accountSession.userId)
     )
       throw new UnauthorizedException('Ticket access expired. Verify again.');
     return session.ticketId;
@@ -174,11 +231,42 @@ export class PublicController {
       if (ticket.status === 'CANCELLED')
         throw new ConflictException('Cancelled tickets cannot be paid');
       if (!ticket.publicAccess?.paidAt) {
+        const paidAt = new Date();
+        const receiptReference = `RCT-${randomBytes(12).toString('hex')}`;
+        const account = await tx.publicTicketSession.findUniqueOrThrow({
+          where: { tokenHash: hashToken(req.headers.authorization!.slice(7)) },
+          include: { accountSession: true },
+        });
+        if (!ticket.motoristId)
+          await tx.ticket.update({
+            where: { id },
+            data: { motoristId: account.accountSession.userId },
+          });
+        await tx.payment.create({
+          data: {
+            ticketId: id,
+            motoristId: account.accountSession.userId,
+            requestKey: randomUUID(),
+            paymentReference: `PAY-${randomBytes(12).toString('hex')}`,
+            amount: ticket.demoFineAmountSnapshot,
+            method: 'LEGACY',
+            status: 'SUCCESS',
+            paidAt,
+            receiptReference,
+          },
+        });
+        await tx.payment.updateMany({
+          where: { ticketId: id, status: 'PROCESSING' },
+          data: {
+            status: 'CANCELLED',
+            failureReason: 'Ticket paid through verified ticket access.',
+          },
+        });
         await tx.publicTicketAccess.update({
           where: { ticketId: id },
           data: {
-            paidAt: new Date(),
-            receiptReference: `PAY-${randomBytes(12).toString('hex')}`,
+            paidAt,
+            receiptReference,
           },
         });
         await tx.auditEvent.create({
@@ -289,7 +377,12 @@ export class PublicManagementController {
           entityId: id,
         },
       });
-      return { warning, reference: ticket.publicReference, verificationCode };
+      return {
+        warning,
+        reference: ticket.publicReference,
+        displayReference: ticket.displayReference,
+        verificationCode,
+      };
     });
   }
   @Get('alerts')

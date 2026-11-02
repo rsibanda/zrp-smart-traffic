@@ -1,10 +1,20 @@
+import { Charge, chargeLines, OffenceLines } from './OffenceLines';
 import { Field } from './Field';
+import { PublicQrStatus } from './TicketQr';
+import { apiUrl, responseError, serviceUnavailable } from './api';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AdminPanel } from './AdminPanel';
-import { OperationsPanel } from './OperationsPanel';
-import { PublicPortal } from './PublicPortal';
+import { StaffWorkspace } from './OfficerWorkspace';
+import { MotoristDashboard } from './MotoristDashboard';
 import { EvidencePanel } from './EvidencePanel';
-import { roleLabel, statusLabel, StatusBadge } from './presentation';
+import {
+  roleLabel,
+  statusLabel,
+  StatusBadge,
+  formatCurrency,
+  paymentMethodLabel,
+  ticketLabel,
+} from './presentation';
 
 type User = {
   id: string;
@@ -12,6 +22,9 @@ type User = {
   role: 'USER' | 'OFFICER' | 'SUPERVISOR' | 'ADMIN';
 };
 type Offence = {
+  observedAt?: string;
+  officer?: { name: string };
+  paymentStatus?: string | null;
   id: string;
   location: string;
   notes: string;
@@ -19,15 +32,31 @@ type Offence = {
   revision: number;
   vehicle: { registrationNumber: string };
   category: { name: string };
+  charges?: Charge[];
   ticket: null | {
     id: string;
     publicReference: string;
+    displayReference?: string;
     demoFineAmountSnapshot: string;
+    demeritPointsSnapshot?: number;
+    motorist?: { name: string };
     status: string;
+    payments?: { method: string; status: string; paidAt: string | null }[];
   };
 };
 type Session = { token: string; user: User };
 export function App() {
+  const [qrToken, setQrToken] = useState(() =>
+    window.location.pathname === '/verify'
+      ? (new URLSearchParams(window.location.hash.slice(1)).get('token') ??
+        new URLSearchParams(window.location.search).get('token') ??
+        '')
+      : '',
+  );
+  useEffect(() => {
+    if (window.location.pathname === '/verify')
+      window.history.replaceState({}, '', '/verify');
+  }, []);
   const adminLogin = window.location.pathname === '/admin';
   const [session, setSession] = useState<Session | null>(null);
   const currentSession = useRef<Session | null>(null);
@@ -37,25 +66,37 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<Offence[]>([]);
   const [selected, setSelected] = useState<Offence | null>(null);
+  const detailPanel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (selected) detailPanel.current?.scrollIntoView?.({ block: 'start' });
+  }, [selected?.id]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('');
   const [search, setSearch] = useState('');
   const api = useCallback(
     async (path: string, body?: unknown, method?: string) => {
       let response: Response;
       try {
-        response = await fetch(`/api/v1${path}`, {
+        response = await fetch(apiUrl(path), {
           method: method ?? (body === undefined ? 'GET' : 'POST'),
           headers: {
-            'Content-Type': 'application/json',
+            ...(body instanceof FormData
+              ? {}
+              : { 'Content-Type': 'application/json' }),
             ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
           },
-          body: body === undefined ? undefined : JSON.stringify(body),
-          signal: AbortSignal.timeout(10000),
+          body:
+            body instanceof FormData
+              ? body
+              : body === undefined
+                ? undefined
+                : JSON.stringify(body),
+          signal: AbortSignal.timeout(body instanceof FormData ? 60000 : 10000),
         });
       } catch {
-        throw new Error('API unavailable. Check your connection and retry.');
+        throw new Error(serviceUnavailable);
       }
       if (
         response.status === 401 &&
@@ -67,12 +108,7 @@ export function App() {
         setSelected(null);
       }
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(
-          [data.message ?? `Request failed (${response.status})`]
-            .flat()
-            .join('. '),
-        );
+        throw await responseError(response);
       }
       return response.status === 204 ? undefined : response.json();
     },
@@ -93,10 +129,15 @@ export function App() {
       if (active) setLoading(true);
       try {
         const data = await api(
-          `/offences?page=${page}&pageSize=20&q=${encodeURIComponent(search)}${status ? `&status=${status}` : ''}`,
+          `/offences?page=${page}&pageSize=20&q=${encodeURIComponent(search)}${status ? `&status=${status}` : ''}${paymentStatus ? `&paymentStatus=${paymentStatus}` : ''}`,
         );
         if (active) {
           setItems(data.items);
+          setSelected((old) =>
+            old
+              ? (data.items.find((item: Offence) => item.id === old.id) ?? old)
+              : null,
+          );
           setTotal(data.total);
           setError('');
         }
@@ -112,7 +153,7 @@ export function App() {
       active = false;
       clearInterval(timer);
     };
-  }, [api, session, page, status, search]);
+  }, [api, session, page, status, search, paymentStatus]);
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -183,10 +224,17 @@ export function App() {
   }
   return (
     <>
-      <header>
+      <header
+        className={
+          ['USER', 'OFFICER', 'SUPERVISOR'].includes(session?.user.role ?? '')
+            ? 'motorist-header'
+            : undefined
+        }
+      >
         <div>
           <span className="eyebrow">TRAFFIC OPERATIONS</span>
-          <h1>ZRP Smart Traffic Management System</h1>
+          <h1>Smart Traffic</h1>
+          <p className="brand-subtitle">In support of ZRP</p>
         </div>
         {session && (
           <div className="session-info">
@@ -202,13 +250,21 @@ export function App() {
           </div>
         )}
       </header>
-      <main aria-busy={busy || loading}>
+      <main
+        className={
+          ['USER', 'OFFICER', 'SUPERVISOR'].includes(session?.user.role ?? '')
+            ? 'motorist-main'
+            : undefined
+        }
+        aria-busy={busy || loading}
+      >
         {loading && <p role="status">Refreshing records…</p>}
         {error && (
           <p role="alert" className="error">
             {error}
           </p>
         )}
+        {!session && qrToken && <PublicQrStatus api={api} token={qrToken} />}
         {!session ? (
           <section className="login">
             <h2>{adminLogin ? 'Administrator sign in' : 'Sign in'}</h2>
@@ -257,7 +313,11 @@ export function App() {
             </form>
           </section>
         ) : session.user.role === 'USER' ? (
-          <PublicPortal
+          <MotoristDashboard
+            initialQrToken={qrToken}
+            onQrConsumed={() => setQrToken('')}
+            api={api}
+            user={session.user}
             accountToken={session.token}
             onSessionExpired={() => {
               setSession(null);
@@ -267,8 +327,12 @@ export function App() {
         ) : session.user.role === 'ADMIN' ? (
           <AdminPanel api={api} />
         ) : (
-          <>
-            <OperationsPanel api={api} user={session.user} />
+          <StaffWorkspace
+            api={api}
+            token={session.token}
+            user={session.user}
+            onOpen={(id) => void open(id)}
+          >
             <section>
               <h2>
                 {session.user.role === 'SUPERVISOR'
@@ -315,6 +379,23 @@ export function App() {
                     }}
                   />
                 </Field>
+                <Field>
+                  Payment status
+                  <select
+                    value={paymentStatus}
+                    onChange={(e) => {
+                      setPaymentStatus(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="">All payments</option>
+                    {['PENDING', 'PAID', 'OVERDUE', 'FAILED'].map((s) => (
+                      <option value={s} key={s}>
+                        {statusLabel(s)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
               </div>
               <div
                 className="table-wrap"
@@ -328,6 +409,7 @@ export function App() {
                       <th>Vehicle registration</th>
                       <th>Category</th>
                       <th>Status</th>
+                      <th>Payment</th>
                       <th className="action-column">Actions</th>
                     </tr>
                   </thead>
@@ -335,9 +417,20 @@ export function App() {
                     {items.map((item) => (
                       <tr key={item.id}>
                         <td>{item.vehicle.registrationNumber}</td>
-                        <td>{item.category.name}</td>
+                        <td>
+                          {chargeLines(item.charges)
+                            .map((c) => c.name)
+                            .join(', ') || item.category.name}
+                        </td>
                         <td>
                           <StatusBadge value={item.status} />
+                        </td>
+                        <td>
+                          {item.paymentStatus ? (
+                            <StatusBadge value={item.paymentStatus} />
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td>
                           <button
@@ -375,11 +468,32 @@ export function App() {
               </div>
             </section>
             {selected && (
-              <section aria-label="Offence detail">
+              <section aria-label="Offence detail" ref={detailPanel}>
                 <h2>
                   {selected.vehicle.registrationNumber} ·{' '}
                   <StatusBadge value={selected.status} />
                 </h2>
+                <h3>
+                  {chargeLines(selected.charges)
+                    .map((c) => c.name)
+                    .join(', ') || selected.category.name}
+                </h3>
+                <OffenceLines lines={chargeLines(selected.charges)} />
+                <p>
+                  Officer: {selected.officer?.name ?? 'Not recorded'} ·
+                  Motorist:{' '}
+                  {selected.ticket?.motorist?.name ?? 'No linked motorist'}
+                </p>
+                {selected.observedAt && (
+                  <p>
+                    Observed {new Date(selected.observedAt).toLocaleString()}
+                  </p>
+                )}
+                {selected.ticket && (
+                  <p>
+                    {selected.ticket.demeritPointsSnapshot ?? 0} demerit points
+                  </p>
+                )}
                 <p>{selected.location}</p>
                 <p>{selected.notes}</p>
                 {session.user.role === 'OFFICER' &&
@@ -467,9 +581,27 @@ export function App() {
                 {selected.ticket && (
                   <div className="ticket">
                     <h3>Traffic ticket</h3>
-                    <p>Reference: {selected.ticket.publicReference}</p>
+                    <p>Reference: {ticketLabel(selected.ticket)}</p>
+                    {selected.paymentStatus && (
+                      <p>
+                        Payment: <StatusBadge value={selected.paymentStatus} />
+                      </p>
+                    )}
+                    {selected.ticket.payments?.[0] && (
+                      <p>
+                        Method:{' '}
+                        {paymentMethodLabel(selected.ticket.payments[0].method)}{' '}
+                        ·{' '}
+                        {selected.ticket.payments[0].paidAt
+                          ? new Date(
+                              selected.ticket.payments[0].paidAt,
+                            ).toLocaleString()
+                          : statusLabel(selected.ticket.payments[0].status)}
+                      </p>
+                    )}
                     <p>
-                      Amount: {selected.ticket.demoFineAmountSnapshot} ·{' '}
+                      Amount:{' '}
+                      {formatCurrency(selected.ticket.demoFineAmountSnapshot)} ·{' '}
                       <StatusBadge value={selected.ticket.status} />
                     </p>
                   </div>
@@ -516,10 +648,12 @@ export function App() {
                   )}
               </section>
             )}
-          </>
+          </StaffWorkspace>
         )}
       </main>
-      <footer className="app-footer">Academic Prototype</footer>
+      <footer className="app-footer">
+        Academic Prototype — No real payments or enforcement
+      </footer>
     </>
   );
 }

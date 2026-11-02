@@ -1,0 +1,29 @@
+# Free backend; evidence persists in a private Neon S3-compatible bucket.
+services:
+  - type: web
+    name: zrp-traffic-api
+    runtime: node
+    region: frankfurt
+    plan: free
+    repo: https://github.com/rsibanda/zrp-smart-traffic
+    branch: deployment/free-hosting
+    autoDeployTrigger: off
+    buildCommand: npm ci --include=dev && npm run build:api
+    startCommand: npm run start:api
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: zrp-traffic-production
+      - key: NODE_VERSION
+        value: 22.23.2
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: EVIDENCE_STORAGE
+        value: s3
+      - key: EVIDENCE_S3_BUCKET
+        value: traffic-evidence
+      - key: AWS_REGION
+        value: eu-central-1
+      - key: CORS_ORIGIN
+        value: https://thunderous-moxie-b0872a.netlify.app

@@ -39,7 +39,52 @@ const category = object({
     type: 'string',
     description: 'Decimal fine amount',
   },
+  demeritPoints: count,
+  paymentDueDays: count,
   active: flag,
+});
+const paymentAttempt = object({
+  reference: text,
+  amount: text,
+  currency: text,
+  method: text,
+  status: text,
+  last4: optional(text),
+  createdAt: date,
+  paidAt: optional(date),
+  receiptReference: optional(text),
+  failureReason: optional(text),
+  simulated: flag,
+});
+const offenceLine = object({
+  categoryId: uuid,
+  name: text,
+  fine: text,
+  points: count,
+});
+const motoristTicket = object({
+  offences: array(offenceLine),
+  displayReference: text,
+  receiptPaymentReference: optional(text),
+  reference: text,
+  amount: text,
+  currency: text,
+  status: text,
+  paymentStatus: text,
+  demeritPoints: count,
+  driverIdentification: text,
+  pointsDeducted: count,
+  issuedAt: date,
+  dueAt: optional(date),
+  category: text,
+  description: text,
+  registration: text,
+  location: text,
+  officer: text,
+  serviceNumber: optional(text),
+  paidAt: optional(date),
+  receiptReference: optional(text),
+  timeline: array(object({ status: text, at: date })),
 });
 const vehicle = object(
   {
@@ -51,6 +96,7 @@ const vehicle = object(
     registrationStatus: text,
     driverId: optional(uuid),
     driver: optional(object({ fullName: text, licenceStatus: text })),
+    motorist: optional(object({ name: text })),
   },
   [
     'id',
@@ -63,19 +109,34 @@ const vehicle = object(
   ],
 );
 const ticket = object({
+  displayReference: text,
   id: uuid,
   offenceId: uuid,
   publicReference: text,
   demoFineAmountSnapshot: text,
+  demeritPointsSnapshot: count,
+  motoristId: optional(uuid),
+  dueAt: optional(date),
   status: { type: 'string', enum: ['ISSUED', 'CANCELLED'] },
   issuedAt: date,
 });
 const offence = object({
   id: uuid,
   officerId: uuid,
+  officer: object({ name: text }),
   supervisorId: uuid,
   vehicleId: uuid,
   categoryId: uuid,
+  charges: array(
+    object({
+      categoryId: uuid,
+      offenceId: uuid,
+      nameSnapshot: optional(text),
+      fineSnapshot: optional(text),
+      pointsSnapshot: optional(count),
+      category,
+    }),
+  ),
   requestKey: uuid,
   location: text,
   notes: text,
@@ -92,7 +153,12 @@ const offence = object({
   reviewNotes: optional(text),
   vehicle,
   category,
-  ticket: optional(ticket),
+  ticket: optional(
+    object({
+      ...ticket.properties,
+      motorist: optional(object({ name: text })),
+    }),
+  ),
 });
 const incident = object({
   id: uuid,
@@ -146,6 +212,9 @@ const alert = object({
   createdAt: date,
 });
 const publicTicket = object({
+  offences: array(offenceLine),
+  displayReference: text,
+  currency: text,
   warning: text,
   reference: text,
   demoAmount: text,
@@ -192,6 +261,36 @@ const security = object({
 
 // Explicit safe response contracts are independent from Prisma's sensitive persistence fields.
 const contracts: Record<string, SchemaObject> = {
+  'get /drivers/verified': object({
+    id: uuid,
+    fullName: text,
+    licenceStatus: text,
+  }),
+  'get /admin/driver-points/policy': object({
+    key: text,
+    allowance: count,
+    version: count,
+  }),
+  'post /admin/driver-points/policy': object({
+    key: text,
+    allowance: count,
+    version: count,
+  }),
+  'post /admin/driver-identities/verify': object({
+    name: text,
+    motorist: text,
+    status: text,
+  }),
+  'get /public/ticket-qr/config': object({ origin: optional(text) }),
+  'post /public/ticket-qr/status': object({ status: text }),
+  'post /motorist/ticket-qr/verify': motoristTicket,
+  'post /tickets/{id}/qr': object({
+    displayReference: text,
+    verificationUrl: text,
+    qrImage: text,
+    expiresAt: date,
+  }),
+  'post /tickets/{id}/qr/revoke': object({ status: text }),
   'post /auth/login': object({ token: text, expiresAt: date, user }),
   'get /auth/me': user,
   'get /vehicles': object({ items: array(vehicle) }),
@@ -204,11 +303,14 @@ const contracts: Record<string, SchemaObject> = {
   'post /offences/{id}/discard': object(
     Object.fromEntries(
       Object.entries(offence.properties!).filter(
-        ([key]) => !['vehicle', 'category', 'ticket'].includes(key),
+        ([key]) => !['vehicle', 'category', 'charges', 'ticket'].includes(key),
       ),
     ) as Record<string, SchemaObject>,
   ),
-  'post /offences/{id}/submit': ticket,
+  'post /offences/{id}/submit': object({
+    ...ticket.properties,
+    offences: array(offenceLine),
+  }),
   'post /offences/{id}/review': offence,
   'get /tickets/{id}': object({
     ...ticket.properties,
@@ -245,8 +347,10 @@ const contracts: Record<string, SchemaObject> = {
   'post /tickets/{id}/access-code': object({
     warning: text,
     reference: text,
+    displayReference: text,
     verificationCode: text,
   }),
+  'get /health': object({ status: { type: 'string', enum: ['ok'] } }),
   'get /public/notices': object({
     warning: text,
     notice: text,
@@ -264,6 +368,292 @@ const contracts: Record<string, SchemaObject> = {
   'post /public/tickets/payment-simulation': publicTicket,
 };
 export function addResponseContracts(document: OpenAPIObject) {
+  Object.assign(contracts, {
+    'post /admin/motorist-links': object({
+      registration: text,
+      motorist: text,
+      message: text,
+    }),
+    'get /motorist/dashboard': object({
+      totalPayable: { type: 'number' },
+      pendingFines: count,
+      demeritPoints: count,
+      paidFines: count,
+      registeredVehicles: count,
+      currency: text,
+    }),
+    'get /motorist/infringements': page(motoristTicket),
+    'get /motorist/infringements/{reference}': object({
+      ...motoristTicket.properties,
+      payments: array(paymentAttempt),
+    }),
+    'get /motorist/vehicles': page(
+      object({
+        activeInfringements: count,
+        totalPayable: { type: 'number' },
+        registrationNumber: text,
+        make: text,
+        model: text,
+        colour: text,
+        registrationStatus: text,
+      }),
+    ),
+    'get /motorist/incidents': page(
+      object({
+        type: text,
+        location: text,
+        description: text,
+        status: text,
+        createdAt: date,
+      }),
+    ),
+    'get /motorist/payments': page(
+      object({
+        ...paymentAttempt.properties,
+        ticketDisplayReference: text,
+        ticketReference: text,
+      }),
+    ),
+    'post /motorist/payments': paymentAttempt,
+    'post /motorist/payments/{reference}/outcome': paymentAttempt,
+    'get /motorist/payments/{reference}/receipt': object({
+      ...paymentAttempt.properties,
+      ticketDisplayReference: text,
+      ticketReference: text,
+      motorist: text,
+      registration: text,
+      offence: text,
+      notice: text,
+    }),
+  });
+  const linkRequest = object({
+    id: uuid,
+    registration: text,
+    kind: text,
+    status: text,
+    submittedAt: date,
+    reviewedAt: optional(date),
+  });
+  const linkedVehicle = object({
+    registrationNumber: text,
+    make: text,
+    model: text,
+    colour: text,
+    registrationStatus: text,
+    nickname: optional(text),
+    linkVerifiedAt: optional(date),
+  });
+  const vehicleTotals = {
+    linkedInfringements: count,
+    activeInfringements: count,
+    paidInfringements: count,
+    totalPayable: { type: 'number' } as SchemaObject,
+    paidAmount: { type: 'number' } as SchemaObject,
+    currency: text,
+  };
+  const vehicleCard = object({
+    ...linkedVehicle.properties,
+    ...vehicleTotals,
+    ownershipStatus: text,
+  });
+  const vehicleDetail = object({
+    ...vehicleCard.properties,
+    checkedAt: date,
+    statusSource: text,
+    infringements: page(motoristTicket),
+    history: array(linkRequest),
+  });
+  Object.assign(contracts, {
+    'get /motorist/vehicles': object({
+      ...page(vehicleCard).properties,
+      summary: object({
+        registeredVehicles: count,
+        activeInfringements: count,
+        totalPayable: { type: 'number' },
+        vehiclesRequiringAttention: count,
+        currency: text,
+      }),
+    }),
+    'get /motorist/vehicles/requests': page(linkRequest),
+    'post /motorist/vehicles/check': object({
+      registration: text,
+      ownershipStatus: text,
+      message: text,
+      vehicle: optional(linkedVehicle),
+    }),
+    'post /motorist/vehicles/link-request': linkRequest,
+    'post /motorist/vehicles/{vehicleId}/unlink-request': linkRequest,
+    'get /motorist/vehicles/{vehicleId}': vehicleDetail,
+    'get /motorist/vehicles/{vehicleId}/status': vehicleDetail,
+    'patch /motorist/vehicles/{vehicleId}': linkedVehicle,
+    'get /admin/vehicle-link-requests': page(
+      object({
+        ...linkRequest.properties,
+        motorist: object({ name: text, email: text }),
+        reviewNote: optional(text),
+        vehicle: optional(linkedVehicle),
+      }),
+    ),
+    'post /admin/vehicle-link-requests/{id}/review': {
+      oneOf: [linkRequest, object({ status: text })],
+    },
+  });
+  const requestDetail = object({
+    ...linkRequest.properties,
+    motorist: object({ name: text, email: text }),
+    reviewNote: optional(text),
+    vehicle: optional(linkedVehicle),
+    linkedToAnotherMotorist: flag,
+    ownershipStatus: text,
+    history: array(
+      object({
+        ...linkRequest.properties,
+        reviewNote: optional(text),
+        reviewer: optional(object({ name: text })),
+      }),
+    ),
+  });
+  Object.assign(contracts, {
+    'get /admin/vehicle-link-requests/{id}': requestDetail,
+    'get /supervisor/vehicle-link-requests':
+      contracts['get /admin/vehicle-link-requests'],
+    'get /supervisor/vehicle-link-requests/{id}': requestDetail,
+    'post /supervisor/vehicle-link-requests/{id}/review':
+      contracts['post /admin/vehicle-link-requests/{id}/review'],
+    'get /supervisor/summary': object({
+      paymentsToday: { type: 'number' },
+      currency: text,
+      pendingVehicleApprovals: count,
+    }),
+    'get /supervisor/payments': page(
+      object({
+        paymentReference: text,
+        amount: text,
+        currency: text,
+        method: text,
+        status: text,
+        createdAt: date,
+        paidAt: optional(date),
+        motorist: object({ name: text }),
+        ticket: object({ displayReference: text }),
+      }),
+    ),
+  });
+  const vehicleCategory = object({
+    id: uuid,
+    code: text,
+    label: text,
+    feeMinor: count,
+    currency: text,
+    active: flag,
+    updatedAt: date,
+  });
+  const applicationFile = object({
+    id: uuid,
+    kind: text,
+    mimeType: text,
+    byteSize: count,
+    createdAt: date,
+  });
+  const applicationPayment = object({
+    id: uuid,
+    applicationId: uuid,
+    requestKey: uuid,
+    reference: text,
+    receiptReference: optional(text),
+    method: text,
+    status: text,
+    feeMinor: count,
+    currency: text,
+    createdAt: date,
+    paidAt: optional(date),
+  });
+  const application = object({
+    requestId: uuid,
+    categoryId: uuid,
+    registration: text,
+    make: text,
+    model: text,
+    year: count,
+    colour: text,
+    chassis: text,
+    engine: text,
+    relationship: text,
+    declaration: flag,
+    feeMinor: count,
+    currency: text,
+    revision: count,
+    status: text,
+    createdAt: date,
+    updatedAt: date,
+    submittedAt: date,
+    reviewedAt: optional(date),
+    reviewNote: optional(text),
+    category: vehicleCategory,
+    applicant: optional(object({ name: text, email: text })),
+    linkedToAnotherMotorist: optional(flag),
+    files: array(applicationFile),
+    payments: array(applicationPayment),
+    decisions: array(
+      object({
+        status: text,
+        reason: text,
+        createdAt: date,
+        reviewer: object({ name: text }),
+      }),
+    ),
+    notice: text,
+  });
+  Object.assign(contracts, {
+    'get /vehicle-categories': array(vehicleCategory),
+    'post /admin/vehicle-categories': vehicleCategory,
+    'patch /admin/vehicle-categories/{id}': vehicleCategory,
+    'get /motorist/vehicle-applications/limits': object({
+      maxFileBytes: count,
+      maxAttachments: count,
+      supportedTypes: array(text),
+    }),
+    'get /motorist/vehicle-applications': page(application),
+    'get /supervisor/vehicle-applications': page(application),
+    'get /motorist/vehicle-applications/{id}': application,
+    'get /supervisor/vehicle-applications/{id}': application,
+    'post /motorist/vehicle-applications': application,
+    'patch /motorist/vehicle-applications/{id}': application,
+    'post /motorist/vehicle-applications/{id}/submit': application,
+    'post /supervisor/vehicle-applications/{id}/review': application,
+    'post /motorist/vehicle-applications/{id}/files/{kind}': applicationFile,
+    'post /motorist/vehicle-application-files/{id}/remove': object({
+      removed: flag,
+    }),
+    'post /vehicle-application-files/{id}/download': object({
+      url: text,
+      expiresAt: date,
+      mimeType: text,
+    }),
+    'post /motorist/vehicle-applications/{id}/payments': applicationPayment,
+    'post /motorist/application-payments/{reference}/outcome':
+      applicationPayment,
+  });
+  const pointsBalance = object({
+    status: text,
+    remaining: optional(count),
+    allowance: optional(count),
+    totalDeducted: count,
+    history: array(
+      object({
+        event: text,
+        delta: { type: 'integer' },
+        reference: text,
+        at: date,
+        reason: text,
+      }),
+    ),
+  });
+  contracts['get /motorist/driver-points'] = pointsBalance;
+  contracts['get /motorist/dashboard'] = object({
+    ...contracts['get /motorist/dashboard'].properties,
+    driverPoints: pointsBalance,
+  });
   for (const [path, operations] of Object.entries(document.paths)) {
     for (const method of ['get', 'post', 'patch'] as const) {
       const operation = operations[method];
@@ -278,7 +668,12 @@ export function addResponseContracts(document: OpenAPIObject) {
           '$ref' in response
         )
           continue;
-        if (route === '/evidence/{id}')
+        if (route === '/vehicle-application-files/{id}/content')
+          response.content = {
+            'application/pdf': { schema: { type: 'string', format: 'binary' } },
+            'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+          };
+        else if (route === '/evidence/{id}')
           response.content = {
             'image/jpeg': { schema: { type: 'string', format: 'binary' } },
           };

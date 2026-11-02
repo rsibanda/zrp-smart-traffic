@@ -1,9 +1,17 @@
 import { Field } from './Field';
+import { apiUrl, responseError, serviceUnavailable } from './api';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { readable, StatusBadge } from './presentation';
+import {
+  readable,
+  StatusBadge,
+  formatCurrency,
+  ticketLabel,
+} from './presentation';
 type Ticket = {
   warning: string;
   reference: string;
+  displayReference?: string;
+  currency?: string;
   category: string;
   demoAmount: string;
   status: string;
@@ -37,7 +45,7 @@ export function PublicPortal({
   async function call(path: string, body?: unknown, access = '') {
     let response: Response;
     try {
-      response = await fetch(`/api/v1/public${path}`, {
+      response = await fetch(apiUrl(`/public${path}`), {
         method: body === undefined ? 'GET' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -47,20 +55,18 @@ export function PublicPortal({
         signal: AbortSignal.timeout(10000),
       });
     } catch {
-      throw new Error(
-        'Connection unavailable. Retry the same action when connected.',
-      );
+      throw new Error(serviceUnavailable);
     }
-    const result = response.status === 204 ? null : await response.json();
     if (!response.ok) {
-      if (response.status === 401 && !access) onSessionExpired();
+      if (response.status === 401 && !access && path !== '/tickets/verify')
+        onSessionExpired();
       if (response.status === 401 && access) {
         setToken('');
         setTicket(null);
       }
-      throw new Error([result.message ?? 'Request failed'].flat().join('. '));
+      throw await responseError(response);
     }
-    return result;
+    return response.status === 204 ? null : response.json();
   }
   useEffect(() => {
     let active = true;
@@ -178,11 +184,11 @@ export function PublicPortal({
       ) : (
         <article className="ticket">
           <h3>Verified Traffic Ticket</h3>
-          <p>Reference: {ticket.reference}</p>
+          <p>Reference: {ticketLabel(ticket)}</p>
           <p>
             {ticket.category} · <StatusBadge value={ticket.status} />
           </p>
-          <p>Amount: {ticket.demoAmount}</p>
+          <p>Amount: {formatCurrency(ticket.demoAmount, ticket.currency)}</p>
           <p>
             Payment status:{' '}
             <StatusBadge value={ticket.paymentStatus} kind="payment" />

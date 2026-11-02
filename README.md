@@ -1,8 +1,14 @@
 # ZRP Smart Traffic Management System
 
-**DEMO / UNIVERSITY PROTOTYPE.** Fictional records only. This project is not an official ZRP system and has no connection to government databases. The UI uses a small **Academic Prototype** footer. Tickets have no legal validity; payment processing remains simulated. Amounts are invented training units, not legal tariffs or currency claims.
+**DEMO / UNIVERSITY PROTOTYPE.** Fictional records only. This project is not an official ZRP system and has no connection to government databases. The UI uses a small **Academic Prototype** footer. Tickets have no legal validity; payment processing remains simulated. Amounts use USD formatting for simulated payments; they are not official tariffs or evidence of legal settlement.
 
 ## Current increment
+
+Hosted release: the 31 October web/API source is live at https://thunderous-moxie-b0872a.netlify.app with all 14 migrations applied. See [current deployment verification and credential notes](DEPLOYMENT.md#deployment---31-october-2026). Earlier pending-deployment notes below are historical; physical-camera acceptance remains pending.
+
+The 31 October offence catalogue update adds ten configurable demonstration penalties and verifies immediate citation calculations and consistent issued-ticket snapshots. See [catalogue values, migration and verification](docs/offence-catalogue-2026-10-31.md). Existing tickets and driver-point history are preserved; apply migrations without reseeding accounts.
+
+The 30 October increment adds secure ticket QR verification, private vehicle applications with supervisor decisions, configurable application fees and payment simulation, and a verified-driver remaining-points ledger. See [setup, workflows and security decisions](docs/ticket-applications-points.md) and [validation status](docs/remaining-work-2026-10-30.md). The interface notice is **Academic Prototype — No real payments or enforcement**. New hosted/device acceptance remains pending; these changes have not been published.
 
 The repository began with only `AGENTS.md`; its wording is preserved. The project uses the current folder as the repository root instead of nesting another `zrp-smart-traffic` directory.
 
@@ -102,7 +108,7 @@ flutter run --dart-define=API_URL=http://10.0.2.2:3000/api/v1
 
 Build without a running emulator using `flutter build apk --debug --dart-define=API_URL=http://10.0.2.2:3000/api/v1` from `apps/officer-mobile`. Output: `apps/officer-mobile/build/app/outputs/flutter-apk/app-debug.apk`.
 
-The bootstrap script preserves the supplied source while generating Android runner files. It permits local HTTP in the **debug** manifest only. The Android emulator uses `10.0.2.2` to reach the host loopback API. A physical device needs an explicitly configured reachable host and firewall rule; that setup has not been verified. Do not expose this prototype to the internet.
+The bootstrap script preserves the supplied source while generating Android runner files. It permits local HTTP in the **debug** manifest only. The Android emulator uses `10.0.2.2` to reach the host loopback API. A physical device needs an explicitly configured reachable host and firewall rule; that setup has not been verified. For public academic hosting, use the separate HTTPS deployment configuration in DEPLOYMENT.md; do not expose the local development servers.
 
 ### Demonstrate the slice
 
@@ -126,7 +132,7 @@ Without Android, use Swagger to exercise the same API: login, find the vehicle, 
 | Officer         | Fictional vehicle and driver-status lookup in Flutter, draft offences, private gallery/camera evidence, demo tickets and motorist access codes, accident/incident reporting and own activity  |
 | Public/motorist | Reference + separate code verification, limited ticket details/status, idempotent payment simulation and demo receipt, polling traffic alerts, unverified road reports                        |
 
-The login page has exactly three categories: **User**, **Officer** and **Supervisor**. Select the category matching your account. Motorist services appear only after **User** sign-in; ticket access still requires its reference and separate verification code. The existing administrator tools are retained at **http://localhost:5173/admin**, outside the three-category login. Administrators can create and manage USER accounts; no public self-registration is provided. All demo accounts use `DEMO_PASSWORD` from the ignored local `.env` file.
+The login page has exactly three categories: **User**, **Officer** and **Supervisor**. Select the category matching your account. Motorist services appear only after **User** sign-in; ticket access still requires its reference and separate verification code. The existing administrator tools are retained at **http://localhost:5173/admin**, outside the three-category login. Administrators can create and manage USER accounts; no public self-registration is provided. Android also offers User, Officer and Supervisor account selection; see the mobile README for supported native workflows. Sign out before selecting another account type. All demo accounts use `DEMO_PASSWORD` from the ignored local `.env` file.
 
 Supervisors use **Overview**, **Incidents** and **Checkpoints** above the existing offence list. Maps show only the current results page; click **View checkpoint map** or **View incident map** to load the attributed basemap. Checkpoints can activate only within their scheduled period.
 
@@ -145,7 +151,11 @@ npm run format:check
 npm run test:integration
 ```
 
-Integration tests create fictional test offences, check simultaneous submission and ownership/review boundaries, then remove only those test offences/tickets and their related audit events. Login audit entries remain. Use a disposable demo database. No production database is supported.
+Integration tests create fictional test offences, check simultaneous submission and ownership/review boundaries, then remove only those test offences/tickets and their related audit events. Login audit entries remain. Use a disposable demo database. These test commands must never target the hosted database.
+
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the GitHub → Netlify frontend and separate NestJS/PostgreSQL deployment. Netlify uses base `.`, build `npm run build:web`, publish `apps/dashboard/dist`, Node 22 and the public `VITE_API_URL` backend origin. Configure backend secrets, persistent evidence storage and exact `CORS_ORIGIN` separately; apply migrations before startup, then redeploy the frontend with the healthy backend URL. No live deployment has been verified.
 
 ## Limitations and retention
 
@@ -156,3 +166,25 @@ All officers may look up seeded fictional vehicles; only record ownership permit
 No automated retention policy exists yet. `docker compose down` preserves the database. **Only when you intend to erase all local demo records**, `docker compose down -v` removes this Compose project's database volume. Never run it against work you want to keep. Evidence is stored privately in ignored `.storage/evidence`. Database reset does not delete these files; remove them only when intentionally clearing the matching demo dataset. No automatic retention job runs.
 
 See [decisions](docs/decisions.md), [API contract](docs/api.md) and [implementation checklist](docs/02-requirements.md). Domain rules and university assessment requirements remain **TO VERIFY**; no course rubric was supplied.
+
+## Account ledger and simulated payment upgrade
+
+Motorists now have linked infringements, balances, points, vehicles, their own incident reports, payment history and receipts on web and Android. Administrators manage verified vehicle/account links and configurable category points/due periods. Officers can issue infringements from either client. EcoCash, InnBucks and Bank Card are local simulations only; no real provider request is sent.
+
+After pulling these changes, run `npm run db:generate`, `npm run db:migrate`, and rebuild/restart the API. For local development only, `npm run db:seed` adds the sample catalogue and links the known ABC1234 vehicle; it preserves records but revokes seeded-account sessions. Production migrations must first be tested on an isolated database branch. Do not seed a populated hosted database.
+
+Test payment details: mobile `0770000000`; card `4242 4242 4242 4242`, expiry `12/30`, CVV `123`, name `Test Motorist`. These input values stay on the device. Only the test last four digits reach the API. Choose a simulated outcome after Continue; resume interrupted processing from Payments. Amounts display in USD for simulation only; no money is collected.
+
+See [implementation, endpoints, security and validation](docs/interface-and-payments.md). Web receipts support download and print/save PDF; Android receipts use the system save/print dialogs. Existing unlinked tickets still require their reference and verification code. Changing vehicle ownership does not transfer historical tickets.
+
+### Interface and account-data refinement
+
+Amounts now use US$ currency formatting and tickets display readable INF references. Existing opaque lookup keys and verification codes still work. See [UI/data refinement](docs/ui-data-refinement.md) for the migration, ownership findings and validation results.
+
+## My Vehicles
+
+Motorists can request a vehicle link, view verified vehicle details and internal status, see account-scoped infringements/fine totals, edit a nickname and request unlinking when outstanding fines are resolved. Administrators review pending requests in **Vehicle Link Requests**. Entering a plate never grants ownership. The web and Android use the same API and existing account relationship. See [vehicle management](docs/vehicle-management.md) for workflow, migration and endpoint details.
+
+### Supervisor command centre
+
+Supervisor sign-in opens the refreshed command centre on web and Android. Inspect `/supervisor/dashboard`, `/supervisor/reviews`, `/supervisor/payments` and `/supervisor/vehicles`. On Android, vehicle approvals and payments are under More. Supervisors can now review motorist vehicle requests with ownership checks and confirmation; conflicting account ownership remains blocked. Update the API alongside both clients; no new migration or reseed is needed. Details and validation: [supervisor layout](docs/supervisor-reference-layout.md).

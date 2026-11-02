@@ -14,3 +14,9 @@ local.properties
 android/.gradle/
 private-storage/
 .storage/
+.netlify/
+.neon
+*.dump
+*.backup
+*.pem
+*.key

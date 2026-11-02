@@ -6,6 +6,10 @@ import {
 } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayNotEmpty,
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsEmail,
   IsIn,
   IsInt,
@@ -60,6 +64,10 @@ export class PageQuery {
   pageSize = 20;
 }
 export class OffenceQuery extends PageQuery {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsIn(['PENDING', 'PAID', 'OVERDUE', 'FAILED'])
+  paymentStatus?: 'PENDING' | 'PAID' | 'OVERDUE' | 'FAILED';
   @ApiPropertyOptional() @IsOptional() @IsString() @Length(0, 80) q?: string;
   @ApiPropertyOptional()
   @IsOptional()
@@ -67,15 +75,43 @@ export class OffenceQuery extends PageQuery {
   status?: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'CONFIRMED' | 'CANCELLED';
 }
 export class CreateOffenceDto {
+  @ApiPropertyOptional({
+    description:
+      'Explicitly identified responsible driver, verified to an account by administration. Omit when responsibility is unverified.',
+  })
+  @IsOptional()
+  @IsUUID()
+  responsibleDriverId?: string;
   @ApiProperty({
     description: 'Client UUID reused for every retry of this draft',
   })
   @IsUUID()
   requestKey!: string;
   @ApiProperty() @IsUUID() vehicleId!: string;
-  @ApiProperty() @IsUUID() categoryId!: string;
+  // Retained for existing single-offence/mobile clients.
+  @ApiPropertyOptional() @IsOptional() @IsUUID() categoryId?: string;
+  @ApiPropertyOptional({
+    type: [String],
+    minItems: 1,
+    maxItems: 100,
+    uniqueItems: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  categoryIds?: string[];
   @ApiProperty() @IsString() @Length(3, 200) @Matches(/\S/) location!: string;
-  @ApiProperty() @IsString() @Length(3, 2000) @Matches(/\S/) notes!: string;
+  @ApiProperty({
+    description:
+      'Optional observation notes; send an empty string when omitted.',
+  })
+  @IsString()
+  @Length(0, 2000)
+  @Matches(/^$|\S/)
+  notes!: string;
   @ApiProperty({ example: '2026-09-21T12:00:00Z' })
   @IsISO8601({ strict: true })
   @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/)
@@ -100,7 +136,11 @@ export class ReviewDto {
   @ApiProperty() @IsString() @Length(3, 1000) @Matches(/\S/) notes!: string;
 }
 export class UpdateOffenceDto extends PartialType(
-  OmitType(CreateOffenceDto, ['requestKey', 'vehicleId'] as const),
+  OmitType(CreateOffenceDto, [
+    'requestKey',
+    'vehicleId',
+    'responsibleDriverId',
+  ] as const),
 ) {
   @ApiProperty({
     description: 'Current draft revision; stale edits return 409',
