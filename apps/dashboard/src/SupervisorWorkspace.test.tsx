@@ -174,3 +174,70 @@ it('requires request detail, ownership checks and explicit confirmation before s
   );
   await screen.findByText('Approved');
 });
+
+it('shows both offence lines alongside a single combined fine in supervisor reviews', async () => {
+  window.history.replaceState({}, '', '/supervisor/dashboard');
+  const multi = {
+    ...row,
+    charges: [
+      {
+        categoryId: 'a',
+        nameSnapshot: 'Speeding',
+        fineSnapshot: '50.00',
+        pointsSnapshot: 3,
+        category: {
+          name: 'Renamed category',
+          demoFineAmount: '999',
+          demeritPoints: 9,
+        },
+      },
+      {
+        categoryId: 'b',
+        nameSnapshot: 'Illegal parking',
+        fineSnapshot: '25.00',
+        pointsSnapshot: 0,
+        category: {
+          name: 'Illegal parking',
+          demoFineAmount: '25',
+          demeritPoints: 0,
+        },
+      },
+    ],
+    ticket: { ...row.ticket, demoFineAmountSnapshot: '75.00' },
+  };
+  const api = vi.fn(async (path: string) => {
+    if (path.startsWith('/offences'))
+      return { items: path.includes('UNDER_REVIEW') ? [] : [multi], total: 1 };
+    if (path.startsWith('/incidents') || path.startsWith('/checkpoints'))
+      return { items: [], total: 0 };
+    if (path === '/analytics/overview')
+      return {
+        submittedOffences: 1,
+        openIncidents: 0,
+        activeCheckpoints: 0,
+        officers: [],
+        tickets: [],
+        trend: [],
+      };
+    if (path === '/supervisor/summary')
+      return { paymentsToday: 0, currency: 'USD', pendingVehicleApprovals: 0 };
+    if (path.startsWith('/supervisor/payments')) return { items: [], total: 0 };
+    if (path === '/alerts') return [];
+    throw new Error(`Unexpected endpoint ${path}`);
+  });
+  render(
+    <SupervisorWorkspace
+      api={api}
+      user={{ id: 'supervisor', role: 'SUPERVISOR', name: 'Supervisor' }}
+      onOpen={vi.fn()}
+    >
+      <p>Existing content</p>
+    </SupervisorWorkspace>,
+  );
+  expect(
+    (await screen.findAllByText('US$50.00 · 3 points')).length,
+  ).toBeGreaterThan(0);
+  expect(screen.getAllByText('US$25.00 · 0 points').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('US$75.00').length).toBeGreaterThan(0);
+  expect(screen.queryByText('Renamed category')).toBeNull();
+});

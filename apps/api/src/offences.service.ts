@@ -1,3 +1,4 @@
+import { offenceLines } from './offence-lines';
 import {
   BadRequestException,
   ConflictException,
@@ -35,6 +36,10 @@ const details = {
   officer: { select: { name: true } },
   vehicle: true,
   category: true,
+  charges: {
+    include: { category: true },
+    orderBy: { categoryId: 'asc' as const },
+  },
   ticket: {
     include: {
       motorist: { select: { name: true } },
@@ -75,7 +80,30 @@ export class OffencesService {
     }
   }
 
+  private selection(dto: { categoryId?: string; categoryIds?: string[] }) {
+    if (dto.categoryId != null && dto.categoryIds != null)
+      throw new BadRequestException('Send categoryId or categoryIds, not both');
+    const ids = dto.categoryIds ?? (dto.categoryId ? [dto.categoryId] : []);
+    if (
+      !Array.isArray(ids) ||
+      !ids.length ||
+      ids.length > 100 ||
+      new Set(ids).size !== ids.length
+    )
+      throw new BadRequestException(
+        'Select one or more distinct offence categories',
+      );
+    const normalised = ids.map((id) => id.toLowerCase());
+    if (new Set(normalised).size !== normalised.length)
+      throw new BadRequestException('Duplicate offence category');
+    return normalised.sort();
+  }
+
   async create(actor: Actor, dto: CreateOffenceDto) {
+    const categoryIds = this.selection(dto);
+    const fields = { ...dto };
+    delete fields.categoryId;
+    delete fields.categoryIds;
     if ((dto.latitude == null) !== (dto.longitude == null))
       throw new BadRequestException('Provide both coordinates or neither');
     if (new Date(dto.observedAt).getTime() > Date.now() + 60000)
@@ -89,7 +117,12 @@ export class OffencesService {
         if (
           existing.officerId !== actor.id ||
           existing.vehicleId !== dto.vehicleId ||
-          existing.categoryId !== dto.categoryId ||
+          JSON.stringify(
+            (existing.charges.length
+              ? existing.charges.map((c) => c.categoryId)
+              : [existing.categoryId]
+            ).sort(),
+          ) !== JSON.stringify(categoryIds) ||
           existing.responsibleDriverId !== (dto.responsibleDriverId ?? null) ||
           existing.notes !== dto.notes ||
           existing.location !== dto.location ||
@@ -107,10 +140,10 @@ export class OffencesService {
       const vehicle = await tx.vehicle.findUnique({
         where: { id: dto.vehicleId },
       });
-      const category = await tx.offenceCategory.findFirst({
-        where: { id: dto.categoryId, active: true },
+      const categories = await tx.offenceCategory.findMany({
+        where: { id: { in: categoryIds }, active: true },
       });
-      if (!vehicle || !category)
+      if (!vehicle || categories.length !== categoryIds.length)
         throw new BadRequestException('Unknown vehicle or inactive category');
       const supervisorId = await assignedSupervisor(tx, actor.id);
       if (
@@ -129,7 +162,11 @@ export class OffencesService {
         );
       const offence = await tx.offence.create({
         data: {
-          ...dto,
+          ...fields,
+          categoryId: categoryIds[0],
+          charges: {
+            create: categoryIds.map((categoryId) => ({ categoryId })),
+          },
           driverConfirmedAt: dto.responsibleDriverId ? new Date() : null,
           observedAt: new Date(dto.observedAt),
           officerId: actor.id,
@@ -273,10 +310,14 @@ export class OffencesService {
         include: details,
       });
       if (!offence) throw new NotFoundException('Record not found');
-      if (offence.ticket) return offence.ticket;
+      if (offence.ticket)
+        return { ...offence.ticket, offences: offenceLines(offence) };
       if (offence.status !== 'DRAFT')
         throw new ConflictException('Only drafts can be submitted');
-      if (!offence.category.active)
+      const categories = offence.charges.length
+        ? offence.charges.map((charge) => charge.category)
+        : [offence.category];
+      if (categories.some((category) => !category.active))
         throw new ConflictException(
           'Choose an active offence category before submitting',
         );
@@ -285,18 +326,44 @@ export class OffencesService {
             where: { id: offence.responsibleDriverId },
           })
         : null;
+      // Freeze each component at issuance, alongside the existing ticket totals.
+      for (const category of categories)
+        await tx.offenceCharge.upsert({
+          where: {
+            offenceId_categoryId: { offenceId: id, categoryId: category.id },
+          },
+          create: {
+            offenceId: id,
+            categoryId: category.id,
+            nameSnapshot: category.name,
+            fineSnapshot: category.demoFineAmount,
+            pointsSnapshot: category.demeritPoints,
+          },
+          update: {
+            nameSnapshot: category.name,
+            fineSnapshot: category.demoFineAmount,
+            pointsSnapshot: category.demeritPoints,
+          },
+        });
       const ticket = await tx.ticket.create({
         data: {
           offenceId: id,
           publicReference: randomBytes(24).toString('hex'),
-          demoFineAmountSnapshot: offence.category.demoFineAmount,
+          demoFineAmountSnapshot: categories.reduce(
+            (sum, c) => sum.plus(c.demoFineAmount),
+            new Prisma.Decimal(0),
+          ),
           motoristId: responsible?.motoristId ?? offence.vehicle.motoristId,
-          demeritPointsSnapshot: offence.category.demeritPoints,
+          demeritPointsSnapshot: categories.reduce(
+            (sum, c) => sum + c.demeritPoints,
+            0,
+          ),
           pointsAssessment: offence.responsibleDriverId
             ? 'ASSESSED'
             : 'PENDING_DRIVER_IDENTIFICATION',
           dueAt: new Date(
-            Date.now() + offence.category.paymentDueDays * 86400000,
+            Date.now() +
+              Math.min(...categories.map((c) => c.paymentDueDays)) * 86400000,
           ),
         },
       });
@@ -310,17 +377,29 @@ export class OffencesService {
           entityId: id,
         },
       });
-      return ticket;
+      return {
+        ...ticket,
+        offences: categories.map((c) => ({
+          categoryId: c.id,
+          name: c.name,
+          fine: c.demoFineAmount.toString(),
+          points: c.demeritPoints,
+        })),
+      };
     });
   }
 
   async update(actor: Actor, id: string, dto: UpdateOffenceDto) {
     const { revision, ...changes } = dto;
+    delete changes.categoryId;
+    delete changes.categoryIds;
+    const selectionChanged = 'categoryId' in dto || 'categoryIds' in dto;
+    const selectedIds = selectionChanged ? this.selection(dto) : undefined;
     if ('responsibleDriverId' in changes)
       throw new BadRequestException(
         'Responsible driver is fixed for this draft. Discard it and create a corrected draft.',
       );
-    if (!Object.keys(changes).length)
+    if (!Object.keys(changes).length && !selectionChanged)
       throw new BadRequestException('Provide a draft change');
     if (
       Object.entries(changes).some(
@@ -349,15 +428,27 @@ export class OffencesService {
           'Draft changed or was submitted. Refresh before editing.',
         );
       if (
-        changes.categoryId &&
-        !(await tx.offenceCategory.findFirst({
-          where: { id: changes.categoryId, active: true },
-        }))
+        selectedIds &&
+        (await tx.offenceCategory.count({
+          where: { id: { in: selectedIds }, active: true },
+        })) !== selectedIds.length
       )
         throw new BadRequestException('Unknown or inactive category');
       const result = await tx.offence.update({
         where: { id },
-        data: { ...changes, revision: { increment: 1 } },
+        data: {
+          ...changes,
+          ...(selectedIds
+            ? {
+                categoryId: selectedIds[0],
+                charges: {
+                  deleteMany: {},
+                  create: selectedIds.map((categoryId) => ({ categoryId })),
+                },
+              }
+            : {}),
+          revision: { increment: 1 },
+        },
         include: details,
       });
       await tx.auditEvent.create({
@@ -367,7 +458,10 @@ export class OffencesService {
           entityType: 'Offence',
           entityId: id,
           safeMetadata: {
-            fields: Object.keys(changes),
+            fields: [
+              ...Object.keys(changes),
+              ...(selectionChanged ? ['categoryIds'] : []),
+            ],
             revision: result.revision,
           },
         },

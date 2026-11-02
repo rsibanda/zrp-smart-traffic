@@ -275,3 +275,63 @@ it('uses five destinations, restores direct routes, and keeps reports under Prof
   fireEvent.click(screen.getByRole('button', { name: 'View all payments' }));
   expect(window.location.pathname).toBe('/motorist/payments');
 });
+
+it('shows every offence and its stored fine and points under one infringement', async () => {
+  const ticket = {
+    reference: 'multi-reference',
+    displayReference: 'INF-2026-000500',
+    category: 'Speeding, Illegal parking',
+    amount: '75.00',
+    currency: 'USD',
+    status: 'SUBMITTED',
+    paymentStatus: 'PENDING',
+    demeritPoints: 3,
+    pointsDeducted: 0,
+    driverIdentification: 'PENDING_DRIVER_IDENTIFICATION',
+    registration: 'ABC1234',
+    location: 'Test junction',
+    officer: 'Test Officer',
+    issuedAt: '2026-11-02T08:00:00Z',
+    dueAt: null,
+    timeline: [],
+    offences: [
+      { categoryId: 'a', name: 'Speeding', fine: '50.00', points: 3 },
+      { categoryId: 'b', name: 'Illegal parking', fine: '25.00', points: 0 },
+    ],
+  };
+  const api = vi.fn(async (path: string) => {
+    if (path === '/motorist/dashboard')
+      return {
+        totalPayable: 75,
+        pendingFines: 1,
+        demeritPoints: 3,
+        paidFines: 0,
+        registeredVehicles: 1,
+        currency: 'USD',
+      };
+    if (path.startsWith('/motorist/infringements?'))
+      return { items: [ticket], total: 1 };
+    if (path === '/motorist/infringements/multi-reference') return ticket;
+    if (path.startsWith('/motorist/payments?')) return { items: [], total: 0 };
+    throw new Error(`Unexpected endpoint ${path}`);
+  });
+  render(
+    <MotoristDashboard
+      api={api}
+      accountToken="test"
+      user={{ name: 'Test Motorist' }}
+      onSessionExpired={() => {}}
+    />,
+  );
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Speeding, Illegal parking' }),
+  );
+  const details = await screen.findByRole('region', {
+    name: 'Infringement details',
+  });
+  expect(within(details).getByText('Speeding')).toBeTruthy();
+  expect(within(details).getByText('Illegal parking')).toBeTruthy();
+  expect(within(details).getByText('US$50.00 · 3 points')).toBeTruthy();
+  expect(within(details).getByText('US$25.00 · 0 points')).toBeTruthy();
+  expect(within(details).getByText('US$75.00')).toBeTruthy();
+});

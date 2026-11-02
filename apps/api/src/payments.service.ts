@@ -1,3 +1,4 @@
+import { offenceLines } from './offence-lines';
 import { CURRENCY } from './currency';
 import {
   ConflictException,
@@ -22,6 +23,10 @@ export const ticketInclude = {
   offence: {
     include: {
       category: true,
+      charges: {
+        include: { category: true },
+        orderBy: { categoryId: 'asc' as const },
+      },
       vehicle: true,
       officer: {
         select: { name: true, profile: { select: { badgeNumber: true } } },
@@ -61,8 +66,13 @@ export function ledgerTicket(ticket: LedgerTicket) {
       .reduce((sum, e) => sum - e.delta, 0),
     issuedAt: ticket.issuedAt,
     dueAt: ticket.dueAt,
-    category: ticket.offence.category.name,
-    description: ticket.offence.category.description,
+    category: offenceLines(ticket.offence)
+      .map((c) => c.name)
+      .join(', '),
+    offences: offenceLines(ticket.offence),
+    description: ticket.offence.charges.length
+      ? ticket.offence.charges.map((c) => c.category.description).join('; ')
+      : ticket.offence.category.description,
     registration: ticket.offence.vehicle.registrationNumber,
     location: ticket.offence.location,
     officer: ticket.offence.officer.name,

@@ -2154,3 +2154,73 @@ button.officer-mobile-issue:is(:hover, :focus, :active) {
   max-height: 400px;
   display: block;
 }
+
+/* Checkbox picker remains in the document flow on narrow screens. */
+.offence-picker {
+  min-width: 0;
+}
+.offence-picker > span {
+  font-weight: 600;
+}
+.offence-picker summary {
+  cursor: pointer;
+  padding: 0.85rem;
+  border: 1px solid #9aadb8;
+  border-radius: 0.5rem;
+  background: white;
+  min-height: 48px;
+}
+.offence-picker summary:focus-visible {
+  outline: 3px solid #b86c0c;
+  outline-offset: 2px;
+}
+.offence-options {
+  max-height: 19rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #9aadb8;
+  border-radius: 0.5rem;
+}
+.offence-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  min-height: 48px;
+  cursor: pointer;
+}
+.offence-options input[type='checkbox'] {
+  width: 1.3rem;
+  height: 1.3rem;
+  flex: 0 0 auto;
+  margin: 0;
+}
+.offence-options small {
+  display: block;
+  font-weight: normal;
+}
+.offence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.offence-chip {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-height: 44px;
+}
+.offence-lines {
+  padding: 0;
+  list-style: none;
+  width: 100%;
+}
+.offence-lines li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  margin: 0.5rem 0;
+  overflow-wrap: anywhere;
+}

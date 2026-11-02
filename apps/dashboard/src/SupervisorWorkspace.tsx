@@ -1,3 +1,4 @@
+import { Charge, chargeLines, OffenceLines } from './OffenceLines';
 import { ReactNode, useEffect, useState } from 'react';
 import type { Api } from './AdminPanel';
 import { MotoristIcon, MotoristIconName } from './MotoristIcon';
@@ -24,6 +25,7 @@ type Row = {
   reporter?: { name: string };
   officer?: { name: string };
   category?: { name: string };
+  charges?: Charge[];
   vehicle?: { registrationNumber: string };
   paymentStatus?: string;
   ticket?: {
@@ -192,8 +194,13 @@ export function SupervisorWorkspace({
                   <strong>
                     {recent
                       ? (r.officer?.name ?? 'Not recorded')
-                      : (r.category?.name ?? 'Traffic offence')}
+                      : chargeLines(r.charges)
+                          .map((c) => c.name)
+                          .join(', ') ||
+                        r.category?.name ||
+                        'Traffic offence'}
                   </strong>
+                  <OffenceLines lines={chargeLines(r.charges)} />
                   <span className="reference-chip">
                     {ticketLabel(r.ticket ?? {})}
                   </span>

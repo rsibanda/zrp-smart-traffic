@@ -1,3 +1,4 @@
+import { OffenceLine, OffenceLines } from './OffenceLines';
 import { MotoristIcon, type MotoristIconName } from './MotoristIcon';
 import { VehicleManager } from './VehicleManager';
 import { TicketScanner } from './TicketQr';
@@ -24,6 +25,7 @@ type Ticket = {
   reference: string;
   amount: string;
   category: string;
+  offences?: OffenceLine[];
   registration: string;
   location: string;
   issuedAt: string;
@@ -709,6 +711,7 @@ export function MotoristDashboard({
           {selected && (
             <section aria-label="Infringement details">
               <h2>{selected.category}</h2>
+              <OffenceLines lines={selected.offences ?? []} />
               <p className="reference">{ticketLabel(selected)}</p>
               <p>{selected.description}</p>
               <dl className="detail-grid">

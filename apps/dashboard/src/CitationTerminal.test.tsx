@@ -50,7 +50,7 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
     if (path === '/offences') {
       expect(body).toMatchObject({
         vehicleId: 'vehicle',
-        categoryId: 'category',
+        categoryIds: ['category', 'dui'],
         location: 'Central intersection',
         notes: 'Observed speeding',
       });
@@ -62,8 +62,8 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
         id: 'ticket',
         publicReference: 'ticket-reference',
         displayReference: 'INF-2026-000125',
-        demoFineAmountSnapshot: '50',
-        demeritPointsSnapshot: 3,
+        demoFineAmountSnapshot: '250',
+        demeritPointsSnapshot: 9,
       };
     throw new Error(`Unexpected endpoint ${path}`);
   });
@@ -84,27 +84,45 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
     ),
   ).not.toBeNull();
   // A synthetic submit must also be guarded, not only the disabled button.
-  fireEvent.submit(screen.getByLabelText('Offence category').closest('form')!);
+  fireEvent.submit(
+    screen.getByRole('group', { name: 'Offence categories' }).closest('form')!,
+  );
   expect(api.mock.calls.some(([path]) => path === '/offences')).toBe(false);
   const summary = document.querySelector(
     '.officer-citation-summary',
   )! as HTMLElement;
-  for (const [id, amount, points] of [
-    ['dui', 'US$200.00', '6 Points'],
-    ['parking', 'US$25.00', '0 Points'],
-    ['category', 'US$50.00', '3 Points'],
-  ]) {
-    fireEvent.change(screen.getByLabelText('Offence category'), {
-      target: { value: id },
-    });
-    expect(within(summary).getByText(amount)).not.toBeNull();
-    expect(within(summary).getByText(points)).not.toBeNull();
-  }
+  // Checkbox toggles and chips both remove selections without duplicates.
+  const picker = screen
+    .getByText('Select offence categories')
+    .closest('details')!;
+  picker.open = true;
+  const speeding = screen.getByRole('checkbox', { name: /Speeding/ });
+  const dui = screen.getByRole('checkbox', { name: /Drunk driving/ });
+  const parking = screen.getByRole('checkbox', { name: /Illegal parking/ });
+  fireEvent.click(speeding);
+  fireEvent.click(dui);
+  expect(within(summary).getByText('US$250.00')).not.toBeNull();
+  expect(within(summary).getByText('9 Points')).not.toBeNull();
+  fireEvent.click(parking);
+  expect(within(summary).getByText('US$275.00')).not.toBeNull();
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Remove Illegal parking' }),
+  );
+  expect((parking as HTMLInputElement).checked).toBe(false);
+  fireEvent.click(dui);
+  expect(within(summary).getByText('US$50.00')).not.toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Remove Speeding' }));
+  expect(
+    (screen.getByRole('button', { name: 'Issue & Send' }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  fireEvent.click(speeding);
+  fireEvent.click(dui);
+  expect(
+    screen.getAllByRole('button', { name: 'Remove Speeding' }),
+  ).toHaveLength(1);
   fireEvent.change(screen.getByLabelText('Location'), {
     target: { value: 'Central intersection' },
-  });
-  fireEvent.change(screen.getByLabelText('Offence category'), {
-    target: { value: 'category' },
   });
   fireEvent.change(screen.getByLabelText('Officer notes (optional)'), {
     target: { value: 'Observed speeding' },
@@ -122,8 +140,8 @@ it('looks up the vehicle, creates a draft and requires confirmation before issui
   await screen.findByRole('heading', { name: 'Infringement issued' });
   expect(screen.getAllByText('INF-2026-000125').length).toBeGreaterThan(0);
   expect(screen.queryByText('ticket-reference')).toBeNull();
-  expect(within(summary).getByText('US$50.00')).not.toBeNull();
-  expect(within(summary).getByText('3 Points')).not.toBeNull();
+  expect(within(summary).getByText('US$250.00')).not.toBeNull();
+  expect(within(summary).getByText('9 Points')).not.toBeNull();
   expect(
     api.mock.calls.filter(([path]) => path.endsWith('/submit')),
   ).toHaveLength(1);

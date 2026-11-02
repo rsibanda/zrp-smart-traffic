@@ -1,3 +1,4 @@
+import { offenceLines } from './offence-lines';
 import { CURRENCY } from './currency';
 import { DriverPointsService } from './driver-points';
 import {
@@ -218,7 +219,9 @@ export class MotoristController {
       ticketReference: payment.ticket.publicReference,
       ticketDisplayReference: payment.ticket.displayReference,
       registration: payment.ticket.offence.vehicle.registrationNumber,
-      offence: payment.ticket.offence.category.name,
+      offence: offenceLines(payment.ticket.offence)
+        .map((c) => c.name)
+        .join(', '),
       notice:
         'Simulated payment receipt — no funds transferred. Academic Prototype.',
     };

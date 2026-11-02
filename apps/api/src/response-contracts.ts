@@ -56,7 +56,14 @@ const paymentAttempt = object({
   failureReason: optional(text),
   simulated: flag,
 });
+const offenceLine = object({
+  categoryId: uuid,
+  name: text,
+  fine: text,
+  points: count,
+});
 const motoristTicket = object({
+  offences: array(offenceLine),
   displayReference: text,
   receiptPaymentReference: optional(text),
   reference: text,
@@ -120,6 +127,16 @@ const offence = object({
   supervisorId: uuid,
   vehicleId: uuid,
   categoryId: uuid,
+  charges: array(
+    object({
+      categoryId: uuid,
+      offenceId: uuid,
+      nameSnapshot: optional(text),
+      fineSnapshot: optional(text),
+      pointsSnapshot: optional(count),
+      category,
+    }),
+  ),
   requestKey: uuid,
   location: text,
   notes: text,
@@ -195,6 +212,7 @@ const alert = object({
   createdAt: date,
 });
 const publicTicket = object({
+  offences: array(offenceLine),
   displayReference: text,
   currency: text,
   warning: text,
@@ -285,11 +303,14 @@ const contracts: Record<string, SchemaObject> = {
   'post /offences/{id}/discard': object(
     Object.fromEntries(
       Object.entries(offence.properties!).filter(
-        ([key]) => !['vehicle', 'category', 'ticket'].includes(key),
+        ([key]) => !['vehicle', 'category', 'charges', 'ticket'].includes(key),
       ),
     ) as Record<string, SchemaObject>,
   ),
-  'post /offences/{id}/submit': ticket,
+  'post /offences/{id}/submit': object({
+    ...ticket.properties,
+    offences: array(offenceLine),
+  }),
   'post /offences/{id}/review': offence,
   'get /tickets/{id}': object({
     ...ticket.properties,

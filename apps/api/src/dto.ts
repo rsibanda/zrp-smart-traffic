@@ -6,6 +6,10 @@ import {
 } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayNotEmpty,
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsEmail,
   IsIn,
   IsInt,
@@ -84,7 +88,21 @@ export class CreateOffenceDto {
   @IsUUID()
   requestKey!: string;
   @ApiProperty() @IsUUID() vehicleId!: string;
-  @ApiProperty() @IsUUID() categoryId!: string;
+  // Retained for existing single-offence/mobile clients.
+  @ApiPropertyOptional() @IsOptional() @IsUUID() categoryId?: string;
+  @ApiPropertyOptional({
+    type: [String],
+    minItems: 1,
+    maxItems: 100,
+    uniqueItems: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  categoryIds?: string[];
   @ApiProperty() @IsString() @Length(3, 200) @Matches(/\S/) location!: string;
   @ApiProperty({
     description:

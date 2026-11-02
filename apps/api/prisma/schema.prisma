@@ -245,6 +245,7 @@ model OffenceCategory {
   demeritPoints Int @default(0)
   paymentDueDays Int @default(30)
   offences Offence[]
+  charges OffenceCharge[]
 }
 model Offence {
   id String @id @default(uuid()) @db.Uuid
@@ -269,6 +270,7 @@ model Offence {
   reviewNotes String?
   ticket Ticket?
   evidence Evidence[]
+  charges OffenceCharge[]
   responsibleDriverId String? @db.Uuid
   responsibleDriver Driver? @relation("ResponsibleDriver", fields: [responsibleDriverId], references: [id])
   driverConfirmedAt DateTime?
@@ -442,4 +444,16 @@ model Evidence {
   uploader User @relation(fields: [uploadedBy], references: [id])
   createdAt DateTime @default(now())
   @@unique([offenceId, sha256])
+}
+
+// One infringement retains its ticket/reference, evidence, review and points ledger.
+model OffenceCharge {
+  offenceId String @db.Uuid
+  categoryId String @db.Uuid
+  offence Offence @relation(fields: [offenceId], references: [id], onDelete: Cascade)
+  category OffenceCategory @relation(fields: [categoryId], references: [id])
+  nameSnapshot String?
+  fineSnapshot Decimal? @db.Decimal(10, 2)
+  pointsSnapshot Int?
+  @@id([offenceId, categoryId])
 }

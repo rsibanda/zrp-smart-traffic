@@ -1,3 +1,4 @@
+import { Charge, chargeLines, OffenceLines } from './OffenceLines';
 import { Field } from './Field';
 import { PublicQrStatus } from './TicketQr';
 import { apiUrl, responseError, serviceUnavailable } from './api';
@@ -31,6 +32,7 @@ type Offence = {
   revision: number;
   vehicle: { registrationNumber: string };
   category: { name: string };
+  charges?: Charge[];
   ticket: null | {
     id: string;
     publicReference: string;
@@ -415,7 +417,11 @@ export function App() {
                     {items.map((item) => (
                       <tr key={item.id}>
                         <td>{item.vehicle.registrationNumber}</td>
-                        <td>{item.category.name}</td>
+                        <td>
+                          {chargeLines(item.charges)
+                            .map((c) => c.name)
+                            .join(', ') || item.category.name}
+                        </td>
                         <td>
                           <StatusBadge value={item.status} />
                         </td>
@@ -467,7 +473,12 @@ export function App() {
                   {selected.vehicle.registrationNumber} ·{' '}
                   <StatusBadge value={selected.status} />
                 </h2>
-                <h3>{selected.category.name}</h3>
+                <h3>
+                  {chargeLines(selected.charges)
+                    .map((c) => c.name)
+                    .join(', ') || selected.category.name}
+                </h3>
+                <OffenceLines lines={chargeLines(selected.charges)} />
                 <p>
                   Officer: {selected.officer?.name ?? 'Not recorded'} ·
                   Motorist:{' '}

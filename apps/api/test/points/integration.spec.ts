@@ -16,6 +16,7 @@ describe('Verified driver points ledger', () => {
   const ids = Array.from({ length: 5 }, () => randomUUID()),
     tokens = ids.map(() => randomBytes(32).toString('hex'));
   const auth = (i: number) => ({ Authorization: `Bearer ${tokens[i]}` });
+  const extraCategoryIds: string[] = [];
   const offenceIds: string[] = [],
     ticketIds: string[] = [];
   const licence = `TEST-${randomUUID()}`;
@@ -131,6 +132,9 @@ describe('Verified driver points ledger', () => {
       await db.ticket.deleteMany({ where: { id: { in: ticketIds } } });
       await db.offence.deleteMany({ where: { id: { in: offenceIds } } });
       if (vehicleId) await db.vehicle.deleteMany({ where: { id: vehicleId } });
+      await db.offenceCategory.deleteMany({
+        where: { id: { in: extraCategoryIds } },
+      });
       if (categoryId)
         await db.offenceCategory.deleteMany({ where: { id: categoryId } });
       if (driverId) {
@@ -382,5 +386,125 @@ describe('Verified driver points ledger', () => {
     expect(await db.offence.count({ where: { officerId: ids[2] } })).toBe(
       before,
     );
+  });
+  it('keeps multiple offences under one reference with immutable lines and one reversible points debit', async () => {
+    await db.offenceCategory.update({
+      where: { id: categoryId },
+      data: {
+        active: true,
+        name: 'Speeding fixture',
+        demoFineAmount: 50,
+        demeritPoints: 3,
+      },
+    });
+    const second = await db.offenceCategory.create({
+      data: {
+        code: `MULTI-${randomUUID()}`,
+        name: 'Parking fixture',
+        description: 'Synthetic multi-offence test',
+        demoFineAmount: 25,
+        demeritPoints: 0,
+      },
+    });
+    extraCategoryIds.push(second.id);
+    const before = (await balance()).totalDeducted;
+    const payload = {
+      requestKey: randomUUID(),
+      vehicleId,
+      categoryIds: [categoryId, second.id],
+      notes: '',
+      location: 'Synthetic multi-offence junction',
+      observedAt: new Date().toISOString(),
+      responsibleDriverId: driverId,
+    };
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/offences')
+      .set(auth(2))
+      .send(payload)
+      .expect(201);
+    offenceIds.push(created.body.id);
+    expect(created.body.charges).toHaveLength(2);
+    const retry = await request(app.getHttpServer())
+      .post('/api/v1/offences')
+      .set(auth(2))
+      .send({ ...payload, categoryIds: [second.id, categoryId] })
+      .expect(201);
+    expect(retry.body.id).toBe(created.body.id);
+    await request(app.getHttpServer())
+      .post('/api/v1/offences')
+      .set(auth(2))
+      .send({
+        ...payload,
+        requestKey: randomUUID(),
+        categoryIds: [categoryId, categoryId],
+      })
+      .expect(400);
+    const [firstIssue, repeatedIssue] = await Promise.all([
+      issue(created.body.id),
+      issue(created.body.id),
+    ]);
+    expect(firstIssue.id).toBe(repeatedIssue.id);
+    expect(firstIssue).toMatchObject({
+      demoFineAmountSnapshot: '75',
+      demeritPointsSnapshot: 3,
+    });
+    expect((await balance()).totalDeducted).toBe(before + 3);
+    expect(
+      await db.driverPointsLedger.count({
+        where: { ticketId: firstIssue.id, event: 'ISSUANCE' },
+      }),
+    ).toBe(1);
+    await db.offenceCategory.updateMany({
+      where: { id: { in: payload.categoryIds } },
+      data: { demoFineAmount: 999, demeritPoints: 9 },
+    });
+    for (const role of [1, 2]) {
+      const detail = await request(app.getHttpServer())
+        .get(`/api/v1/offences/${created.body.id}`)
+        .set(auth(role))
+        .expect(200);
+      expect(detail.body.charges).toHaveLength(2);
+      expect(
+        detail.body.charges.find(
+          (c: { categoryId: string }) => c.categoryId === second.id,
+        ),
+      ).toMatchObject({ fineSnapshot: '25', pointsSnapshot: 0 });
+      expect(detail.body.ticket.displayReference).toBe(
+        firstIssue.displayReference,
+      );
+      expect(detail.body.ticket.demoFineAmountSnapshot).toBe('75');
+    }
+    const motorist = await request(app.getHttpServer())
+      .get(`/api/v1/motorist/infringements/${firstIssue.publicReference}`)
+      .set(auth(3))
+      .expect(200);
+    expect(motorist.body).toMatchObject({
+      amount: '75',
+      demeritPoints: 3,
+      offences: expect.arrayContaining([
+        { categoryId, name: 'Speeding fixture', fine: '50', points: 3 },
+        {
+          categoryId: second.id,
+          name: 'Parking fixture',
+          fine: '25',
+          points: 0,
+        },
+      ]),
+    });
+    await request(app.getHttpServer())
+      .get(`/api/v1/motorist/infringements/${firstIssue.publicReference}`)
+      .set(auth(4))
+      .expect(404);
+    await request(app.getHttpServer())
+      .post(`/api/v1/offences/${created.body.id}/review`)
+      .set(auth(1))
+      .send({ status: 'UNDER_REVIEW', notes: 'Synthetic review' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/offences/${created.body.id}/review`)
+      .set(auth(1))
+      .send({ status: 'CANCELLED', notes: 'Synthetic cancellation' })
+      .expect(201);
+    expect((await balance()).totalDeducted).toBe(before);
   });
 });

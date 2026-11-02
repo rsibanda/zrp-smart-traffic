@@ -1,3 +1,4 @@
+import { Charge, chargeLines, OffenceLine, OffenceLines } from './OffenceLines';
 import { formatCurrency, ticketLabel, StatusBadge } from './presentation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Field } from './Field';
@@ -33,12 +34,13 @@ export function CitationTerminal({
   const formId = useId();
   const [responsibleDriver, setResponsibleDriver] = useState('');
   const [categories, setCategories] = useState<Category[]>([]),
-    [category, setCategory] = useState('');
+    [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null),
     [registration, setRegistration] = useState('');
   const [draft, setDraft] = useState<{
       id: string;
       category?: Category;
+      charges?: Charge[];
     } | null>(null),
     [ticket, setTicket] = useState<{
       id: string;
@@ -46,6 +48,7 @@ export function CitationTerminal({
       displayReference?: string;
       demoFineAmountSnapshot: string;
       demeritPointsSnapshot: number;
+      offences?: OffenceLine[];
     } | null>(null);
   const [code, setCode] = useState(''),
     [error, setError] = useState(''),
@@ -53,22 +56,40 @@ export function CitationTerminal({
     [uncertain, setUncertain] = useState(false);
   const pending = useRef<unknown>(null);
   const preview = useRef<HTMLDialogElement>(null);
-  const selected = categories.find((c) => c.id === category);
+  const selected = categories.filter((c) => categoryIds.includes(c.id));
+  const savedLines = chargeLines(draft?.charges);
+  const lines =
+    ticket?.offences ??
+    (savedLines.length
+      ? savedLines
+      : selected.map((c) => ({
+          categoryId: c.id,
+          name: c.name,
+          fine: c.demoFineAmount,
+          points: c.demeritPoints,
+        })));
   const fine =
     ticket?.demoFineAmountSnapshot ??
-    draft?.category?.demoFineAmount ??
-    selected?.demoFineAmount;
+    (lines.length
+      ? (
+          lines.reduce((sum, c) => sum + Math.round(Number(c.fine) * 100), 0) /
+          100
+        ).toFixed(2)
+      : undefined);
   const points =
     ticket?.demeritPointsSnapshot ??
-    draft?.category?.demeritPoints ??
-    selected?.demeritPoints;
+    (lines.length ? lines.reduce((sum, c) => sum + c.points, 0) : undefined);
+  const toggleCategory = (id: string) =>
+    setCategoryIds((ids) =>
+      ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id],
+    );
   useEffect(() => {
     let active = true;
     void api('/offence-categories')
       .then((data) => {
         if (active) {
           setCategories(data);
-          setCategory('');
+          setCategoryIds([]);
         }
       })
       .catch((e) => {
@@ -169,7 +190,7 @@ export function CitationTerminal({
                   id={formId}
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (!selected) {
+                    if (!selected.length) {
                       setError(
                         'Select a valid offence category before continuing.',
                       );
@@ -180,7 +201,7 @@ export function CitationTerminal({
                       pending.current = {
                         requestKey: crypto.randomUUID(),
                         vehicleId: vehicle.id,
-                        categoryId: category,
+                        categoryIds,
                         ...(responsibleDriver
                           ? { responsibleDriverId: responsibleDriver }
                           : {}),
@@ -199,23 +220,67 @@ export function CitationTerminal({
                 >
                   <fieldset disabled={busy || !!draft || uncertain}>
                     <div className="form-grid citation-fields">
-                      <Field>
-                        Offence category
-                        <select
-                          value={category}
-                          onChange={(e) => setCategory(e.target.value)}
-                          required
+                      <div className="field offence-picker">
+                        <span id={`${formId}-offences-label`}>
+                          Offence categories
+                        </span>
+                        <details
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              e.currentTarget.open = false;
+                              e.currentTarget.querySelector('summary')?.focus();
+                            }
+                          }}
                         >
-                          <option value="" disabled>
-                            Select an offence category
-                          </option>
-                          {categories.map((c) => (
-                            <option value={c.id} key={c.id}>
-                              {c.name}
-                            </option>
+                          <summary
+                            aria-labelledby={`${formId}-offences-label ${formId}-offences-summary`}
+                          >
+                            <span id={`${formId}-offences-summary`}>
+                              {selected.length
+                                ? `${selected.length} offences selected`
+                                : 'Select offence categories'}
+                            </span>
+                          </summary>
+                          <div
+                            className="offence-options"
+                            role="group"
+                            aria-label="Offence categories"
+                          >
+                            {categories.map((c) => (
+                              <label key={c.id}>
+                                <input
+                                  type="checkbox"
+                                  checked={categoryIds.includes(c.id)}
+                                  onChange={() => toggleCategory(c.id)}
+                                />
+                                <span>
+                                  {c.name}
+                                  <small>
+                                    {formatCurrency(c.demoFineAmount)} ·{' '}
+                                    {c.demeritPoints} points
+                                  </small>
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </details>
+                        <div
+                          className="offence-chips"
+                          aria-label="Selected offence chips"
+                        >
+                          {selected.map((c) => (
+                            <button
+                              type="button"
+                              className="secondary offence-chip"
+                              key={c.id}
+                              aria-label={`Remove ${c.name}`}
+                              onClick={() => toggleCategory(c.id)}
+                            >
+                              {c.name} <span aria-hidden="true">×</span>
+                            </button>
                           ))}
-                        </select>
-                      </Field>
+                        </div>
+                      </div>
                       <Field>
                         Location
                         <input
@@ -237,10 +302,11 @@ export function CitationTerminal({
                     </div>
                   </fieldset>
                   <p className="muted">
-                    The selected category determines the fine and points.
-                    Observation time is recorded when the draft is saved.
+                    The selected offences determine the combined fine and
+                    points. Observation time is recorded when the draft is
+                    saved.
                   </p>
-                  {!selected && (
+                  {!selected.length && (
                     <p role="status">
                       Select a valid offence category to calculate the fine and
                       demerit points.
@@ -268,7 +334,8 @@ export function CitationTerminal({
           <StatusBadge
             value={ticket ? 'SUBMITTED' : draft ? 'DRAFT' : 'PENDING'}
           />
-          <span>Calculated Fine</span>
+          <OffenceLines lines={lines} />
+          <span>Total Fine</span>
           <strong className="officer-fine-total" aria-live="polite">
             {fine !== undefined ? formatCurrency(fine) : 'Select an offence'}
           </strong>
@@ -282,7 +349,7 @@ export function CitationTerminal({
               <button
                 form={formId}
                 type="submit"
-                disabled={busy || !vehicle || !selected}
+                disabled={busy || !vehicle || !selected.length}
               >
                 {uncertain ? 'Retry same draft' : 'Issue & Send'}
               </button>
@@ -328,7 +395,7 @@ export function CitationTerminal({
               setTicket(null);
               setDraft(null);
               setVehicle(null);
-              setCategory('');
+              setCategoryIds([]);
               setCode('');
               pending.current = null;
             }}
@@ -340,8 +407,9 @@ export function CitationTerminal({
       <dialog ref={preview} aria-labelledby="citation-confirm">
         <h2 id="citation-confirm">Issue this infringement?</h2>
         <p>
-          {vehicle?.registrationNumber} · {selected?.name}
+          {vehicle?.registrationNumber} · {lines.map((c) => c.name).join(', ')}
         </p>
+        <OffenceLines lines={lines} />
         <p>
           {fine !== undefined ? formatCurrency(fine) : 'Select an offence'} ·{' '}
           {points ?? 'Not selected'} points

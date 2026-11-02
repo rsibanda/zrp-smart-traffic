@@ -1,3 +1,4 @@
+import { offenceLines } from './offence-lines';
 import { CURRENCY } from './currency';
 import {
   BadRequestException,
@@ -42,7 +43,12 @@ const warning = 'Academic Prototype';
 async function publicTicket(tx: Prisma.TransactionClient, ticketId: string) {
   const ticket = await tx.ticket.findUniqueOrThrow({
     where: { id: ticketId },
-    include: { publicAccess: true, offence: { include: { category: true } } },
+    include: {
+      publicAccess: true,
+      offence: {
+        include: { category: true, charges: { include: { category: true } } },
+      },
+    },
   });
   return {
     warning,
@@ -52,7 +58,10 @@ async function publicTicket(tx: Prisma.TransactionClient, ticketId: string) {
     demoAmount: ticket.demoFineAmountSnapshot,
     status: ticket.status,
     issuedAt: ticket.issuedAt,
-    category: ticket.offence.category.name,
+    category: offenceLines(ticket.offence)
+      .map((c) => c.name)
+      .join(', '),
+    offences: offenceLines(ticket.offence),
     paymentStatus: ticket.publicAccess?.paidAt
       ? 'SIMULATED_PAID'
       : 'NOT_SIMULATED',
